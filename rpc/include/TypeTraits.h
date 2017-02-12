@@ -3,6 +3,7 @@
 #ifndef SIMPLERPC_TYPETRAITS_H
 #define SIMPLERPC_TYPETRAITS_H
 
+#include <mutex>
 #include <memory>
 #include <string>
 #include <vector>
@@ -157,15 +158,37 @@ struct Struct
     };
 
 private:
-    Meta *_meta;
+    mutable Meta *_meta;
+    mutable std::mutex _mutex;
+
+private:
+    std::string _name;
     std::unordered_set<std::string> _names;
+
+protected:
+    explicit Struct() : _meta(nullptr) {}
 
 public:
     bool isSet(const std::string &name) const { return _names.find(name) != _names.end(); }
 
-protected:
-    void markSet(const std::string &name) { _names.insert(name); }
+public:
+    const Meta &meta(void) const;
+    const std::string &name(void) const { return _name; }
 
+protected:
+    void setName(const std::string &name) { _name = name; }
+    void setField(const std::string &name) { _names.insert(name); }
+
+public:
+    std::string readableName(void) const
+    {
+        int status;
+        char *demangled = abi::__cxa_demangle(_name.c_str(), nullptr, nullptr, &status);
+        std::string result = demangled ? std::string(demangled) : _name;
+
+        free(demangled);
+        return result;
+    }
 };
 
 struct Registry

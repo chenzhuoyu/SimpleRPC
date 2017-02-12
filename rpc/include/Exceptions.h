@@ -50,7 +50,11 @@ private:
     static inline std::string demangle(const char *name)
     {
         int status;
-        return abi::__cxa_demangle(name, nullptr, nullptr, &status) ?: name;
+        char *demangled = abi::__cxa_demangle(name, nullptr, nullptr, &status);
+        std::string result = demangled ?: name;
+
+        free(demangled);
+        return result;
     }
 
 public:

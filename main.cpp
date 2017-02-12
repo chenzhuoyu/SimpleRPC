@@ -8,8 +8,9 @@ defineClass(Test,
 
 int main()
 {
-    SimpleRPC::Struct::Meta meta = SimpleRPC::Registry::findClass(typeid(Test).name());
-    for (const auto &pair : meta.fields)
+    Test test;
+    std::cout << "class: " << test.readableName() << std::endl;
+    for (const auto &pair : test.meta().fields)
     {
         if (pair.second.isRequired())
             std::cout << pair.second.type().toString() << " " << pair.second.name() << ";" << std::endl;
