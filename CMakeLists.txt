@@ -3,6 +3,10 @@ project(SimpleRPC)
 
 set(CMAKE_CXX_STANDARD 14)
 
-set(SOURCE_FILES src/main.cpp)
+include_directories(
+        ${CMAKE_SOURCE_DIR}/boost_lite
+        ${CMAKE_SOURCE_DIR}/include)
+
+set(SOURCE_FILES main.cpp rpc/Registry.cpp rpc/Registry.h rpc/TypeTraits.h rpc/Exceptions.h)
 
 add_executable(SimpleRPC ${SOURCE_FILES})
