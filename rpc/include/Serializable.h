@@ -91,8 +91,7 @@ public:
         __SRPC_DEFINE_ARG_REQ                           \
     )(__VA_ARGS__)
 
-#define __SRPC_EXPAND_ARG(s, data, elem)                BOOST_PP_SEQ_ELEM(2, elem)
-#define __SRPC_MEMBER_DECL_FUNC(type, elem)             BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(__SRPC_EXPAND_ARG, type, BOOST_PP_SEQ_ELEM(3, elem))));
+#define __SRPC_MEMBER_DECL_FUNC(type, elem)             BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_ELEM(3, elem)));
 #define __SRPC_MEMBER_REFL_FUNC(type, elem)
 
 #define defineMethod(ret, name, ...)                    (FUNC)(ret)(name)(BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))

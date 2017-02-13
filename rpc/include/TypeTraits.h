@@ -179,8 +179,16 @@ struct Descriptor
         std::string name;
 
     public:
+        explicit MemberData() : type(Type::TypeCode::Struct) {}
         explicit MemberData(const std::string &name, const Type &type, size_t offset, bool required) : name(name), type(type), offset(offset), required(required) {}
 
+    public:
+        template <typename Function>
+        static MemberData makeFunction(Function function)
+        {
+            fprintf(stderr, "fp = %p\n", &function);
+            return MemberData();
+        }
     };
 
 public:
