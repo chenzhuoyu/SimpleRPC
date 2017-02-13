@@ -8,6 +8,7 @@
 #include <stdexcept>
 
 #include <cxxabi.h>
+#include <stdlib.h>
 
 namespace SimpleRPC
 {
