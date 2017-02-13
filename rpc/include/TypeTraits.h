@@ -139,13 +139,18 @@ public:
 public:
     bool isRequired(void) const { return _required; }
 
+public:
+    template <typename T>
+    T &data(void *self) const { return *(T *)((uintptr_t)self + _offset); }
+
 };
 
-struct Struct
+class Serializable;
+struct Registry
 {
     struct Meta
     {
-        typedef Struct *(* Constructor)(void);
+        typedef Serializable *(* Constructor)(void);
         typedef std::unordered_map<std::string, Field> FieldData;
 
     public:
@@ -157,50 +162,16 @@ struct Struct
 
     };
 
-private:
-    mutable Meta *_meta;
-    mutable std::mutex _mutex;
-
-private:
-    std::string _name;
-    std::unordered_set<std::string> _names;
-
-protected:
-    explicit Struct() : _meta(nullptr) {}
-
 public:
-    bool isSet(const std::string &name) const { return _names.find(name) != _names.end(); }
+    static void addClass(const std::string &name, const Meta &meta);
+    static Meta &findClass(const std::string &name);
 
-public:
-    const Meta &meta(void) const;
-    const std::string &name(void) const { return _name; }
-
-protected:
-    void setName(const std::string &name) { _name = name; }
-    void setField(const std::string &name) { _names.insert(name); }
-
-public:
-    std::string readableName(void) const
-    {
-        int status;
-        char *demangled = abi::__cxa_demangle(_name.c_str(), nullptr, nullptr, &status);
-        std::string result = demangled ? std::string(demangled) : _name;
-
-        free(demangled);
-        return result;
-    }
-};
-
-struct Registry
-{
-    static void addClass(const std::string &name, const Struct::Meta &meta);
-    static Struct::Meta &findClass(const std::string &name);
 };
 
 template <typename T>
 struct Descriptor
 {
-    struct FieldInfo
+    struct MemberData
     {
         Type type;
         bool required;
@@ -208,22 +179,22 @@ struct Descriptor
         std::string name;
 
     public:
-        explicit FieldInfo(const std::string &name, const Type &type, size_t offset, bool required) : name(name), type(type), offset(offset), required(required) {}
+        explicit MemberData(const std::string &name, const Type &type, size_t offset, bool required) : name(name), type(type), offset(offset), required(required) {}
 
     };
 
 public:
-    explicit Descriptor(const std::vector<FieldInfo> &fields)
+    explicit Descriptor(const std::vector<MemberData> &fields)
     {
         /* class meta data */
-        Struct::Meta meta([](void) -> Struct *
+        Registry::Meta meta([](void) -> Serializable *
         {
             /* just instaniate corresponding class */
             return new T;
         });
 
         /* fill fields data */
-        for (const FieldInfo &info : fields)
+        for (const MemberData &info : fields)
         {
             meta.fields.insert({
                 info.name,
@@ -245,7 +216,7 @@ public:
 template <typename T>
 inline Type resolve(const T &)
 {
-    static_assert(std::is_convertible<T *, Struct *>::value, "Cannot serialize or deserialize arbitrary type");
+    static_assert(std::is_convertible<T *, Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
     return Type(Type::TypeCode::Struct, typeid(T).name());
 }
 
