@@ -57,8 +57,8 @@ public:
 #define __SRPC_MEMBER_DECL_VAR(type, elem)              BOOST_PP_SEQ_ELEM(3, elem);
 #define __SRPC_MEMBER_REFL_VAR(type, elem)              BOOST_PP_CAT(__SRPC_MEMBER_REFL_VAR_, BOOST_PP_SEQ_ELEM(1, elem))(type, BOOST_PP_SEQ_ELEM(2, elem))
 
-#define __SRPC_MEMBER_REFL_VAR_REQ(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), ::SimpleRPC::resolve(((type *)nullptr)->field), (size_t)(&(((type *)nullptr)->field)), true),
-#define __SRPC_MEMBER_REFL_VAR_OPT(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), ::SimpleRPC::resolve(((type *)nullptr)->field), (size_t)(&(((type *)nullptr)->field)), false),
+#define __SRPC_MEMBER_REFL_VAR_REQ(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), reinterpret_cast<type *>(nullptr)->field, true),
+#define __SRPC_MEMBER_REFL_VAR_OPT(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), reinterpret_cast<type *>(nullptr)->field, false),
 
 #define defineClass(type, ...)                                                                                  \
     struct type : public ::SimpleRPC::Serializable                                                              \
@@ -92,7 +92,7 @@ public:
     )(__VA_ARGS__)
 
 #define __SRPC_MEMBER_DECL_FUNC(type, elem)             BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_ELEM(3, elem)));
-#define __SRPC_MEMBER_REFL_FUNC(type, elem)
+#define __SRPC_MEMBER_REFL_FUNC(type, elem)             ::SimpleRPC::Descriptor<Test>::MemberData(&type::BOOST_PP_SEQ_ELEM(2, elem)),
 
 #define defineMethod(ret, name, ...)                    (FUNC)(ret)(name)(BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 

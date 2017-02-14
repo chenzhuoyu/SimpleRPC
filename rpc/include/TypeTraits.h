@@ -31,22 +31,31 @@ class Type
 public:
     enum class TypeCode : int
     {
-        Int8    = 0,
-        Int16   = 1,
-        Int32   = 2,
-        Int64   = 3,
+        /* signed integers */
+        Int8,
+        Int16,
+        Int32,
+        Int64,
 
-        UInt8   = 4,
-        UInt16  = 5,
-        UInt32  = 6,
-        UInt64  = 7,
+        /* unsigned integers */
+        UInt8,
+        UInt16,
+        UInt32,
+        UInt64,
 
-        Float   = 8,
-        Double  = 9,
+        /* floating point numbers */
+        Float,
+        Double,
 
-        Array   = 10,
-        Struct  = 11,
-        String  = 12,
+        /* STL string */
+        String,
+
+        /* compond types */
+        Array,
+        Struct,
+
+        /* used for counting number of types, not actually a type */
+        TypeCount
     };
 
 private:
@@ -115,6 +124,12 @@ public:
             case TypeCode::Struct   : return _className;
             case TypeCode::String   : return "std::string";
             case TypeCode::Array    : return "std::vector<" + _itemType->toString() + ">";
+
+            default:
+            {
+                fprintf(stderr, "*** FATAL: impossible type %d\n", static_cast<int>(_typeCode));
+                abort();
+            }
         }
     }
 };
@@ -146,7 +161,7 @@ public:
 
 public:
     template <typename T>
-    T &data(void *self) const { return *(T *)((uintptr_t)self + _offset); }
+    T &data(void *self) const { return *reinterpret_cast<T *>(reinterpret_cast<uintptr_t>(self) + _offset); }
 
 };
 
@@ -274,7 +289,7 @@ struct Descriptor
     public:
         template <typename FieldType>
         explicit MemberData(const std::string &name, const FieldType &field, bool isRequired) :
-            isMethod(false), field(new Field(name, TypeItem<FieldType>::type(), (uintptr_t)&field, isRequired)) {}
+            isMethod(false), field(new Field(name, TypeItem<FieldType>::type(), reinterpret_cast<uintptr_t>(&field), isRequired)) {}
 
     public:
         template <typename Result, typename ... Args>
@@ -300,7 +315,7 @@ public:
         /* class meta data */
         Registry::Meta meta([](void) -> Serializable *
         {
-            /* just instaniate corresponding class */
+            /* just to instaniate corresponding class */
             return new T;
         });
 
