@@ -6,11 +6,14 @@
 #include <string>
 #include <memory>
 #include <vector>
-#include <stdint.h>
 #include <unordered_map>
+
+#include <stdint.h>
+#include <string.h>
 
 #include "TypeInfo.h"
 #include "Exceptions.h"
+#include "Functional.h"
 
 namespace SimpleRPC
 {
@@ -32,6 +35,20 @@ class Variant
 
         float    _float;
         double   _double;
+
+        /* used by copy constructor and move constructor / assignment */
+        uint8_t  _buffer[Functional::max(
+            sizeof(int8_t  ),
+            sizeof(int16_t ),
+            sizeof(int32_t ),
+            sizeof(int64_t ),
+            sizeof(uint8_t ),
+            sizeof(uint16_t),
+            sizeof(uint32_t),
+            sizeof(uint64_t),
+            sizeof(float   ),
+            sizeof(double  )
+        )];
     };
 
 public:
@@ -47,7 +64,7 @@ private:
     Type::TypeCode _type;
 
 public:
-    Variant(const Type::TypeCode &type) : _type(type) {}
+    explicit Variant(const Type::TypeCode &type) : _type(type) {}
 
 public:
     Variant(int8_t  value) : _type(Type::TypeCode::Int8 ), _s8 (value) {}
@@ -72,6 +89,48 @@ public:
 public:
     Variant(const Array  &value) : _type(Type::TypeCode::Array ), _array (value) {}
     Variant(const Object &value) : _type(Type::TypeCode::Struct), _object(value) {}
+
+public:
+    Variant(Variant &&other)      { swap(std::move(other)); }
+    Variant(const Variant &other) { assign(other);          }
+
+public:
+    Variant &operator=(Variant &&other)
+    {
+        swap(std::move(other));
+        return *this;
+    }
+
+public:
+    Variant &operator=(const Variant &other)
+    {
+        assign(other);
+        return *this;
+    }
+
+public:
+    void swap(Variant &&other)
+    {
+        std::swap(_type, other._type);
+        std::swap(_array, other._array);
+        std::swap(_object, other._object);
+        std::swap(_string, other._string);
+
+        /* no need to clear other's buffer, primitive types are harmless */
+        memcpy(_buffer, other._buffer, sizeof(_buffer));
+    }
+
+public:
+    void assign(const Variant &other)
+    {
+        _type = other._type;
+        _array = other._array;
+        _object = other._object;
+        _string = other._string;
+
+        /* copy from other union */
+        memcpy(_buffer, other._buffer, sizeof(_buffer));
+    }
 
 public:
     /* specializations below */

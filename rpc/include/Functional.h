@@ -22,13 +22,27 @@ namespace Implementation
 template <typename T, typename Method, class ArgsTuple, size_t ... I>
 constexpr auto applyImpl(T *self, Method &&method, ArgsTuple &&args, std::index_sequence<I ...>)
 {
+    /* tuple expansion */
     return (self->*method)(std::get<I>(std::forward<ArgsTuple>(args)) ...);
 }
+}
+
+template <typename T>
+constexpr T &&max(T &&a, T &&b)
+{
+    return a > b ? std::forward<T>(a) : std::forward<T>(b);
+}
+
+template <typename T, typename ... Args>
+constexpr T &&max(T &&a, Args && ... args)
+{
+    return max(std::forward<T>(a), max(std::forward<Args>(args) ...));
 }
 
 template <typename T, typename F, typename Tuple>
 constexpr auto apply(T *self, F &&f, Tuple &&t)
 {
+    /* build an index sequence for tuple expansion */
     return Implementation::applyImpl(
         self,
         std::forward<F>(f),
