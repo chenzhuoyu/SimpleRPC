@@ -67,7 +67,7 @@ private:
     Method &operator=(const Method &) = delete;
 
 public:
-    typedef std::function<Variant(void *, const Variant &)> Proxy;
+    typedef std::function<Variant(::SimpleRPC::Serializable *, const Variant &)> Proxy;
 
 private:
     Proxy _proxy;
@@ -83,7 +83,7 @@ public:
     const std::vector<Type> &args(void) const { return _args; }
 
 public:
-    Variant invoke(void *self, const Variant &args) const { return _proxy(self, args); }
+    Variant invoke(::SimpleRPC::Serializable *self, const Variant &args) const { return _proxy(self, args); }
 
 };
 
@@ -182,6 +182,9 @@ struct ParamTuple<>
 template <typename T>
 struct Descriptor
 {
+    static_assert(std::is_convertible<T *, ::SimpleRPC::Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
+
+public:
     struct MemberData
     {
         bool isMethod;
@@ -200,10 +203,10 @@ struct Descriptor
                 typeid(method).name(),
                 TypeItem<Result>::type(),
                 TypeArray<Args ...>::type(),
-                [=](void *self, const Variant &argv)
+                [=](::SimpleRPC::Serializable *self, const Variant &argv)
                 {
                     /* simple proxy lambda to invoke target method with parameter array */
-                    return Variant(Functional::apply(reinterpret_cast<T *>(self), method, ParamTuple<Args ...>::expand(argv)));
+                    return Variant(Functional::apply(static_cast<T *>(self), method, ParamTuple<Args ...>::expand(argv)));
                 }
             )) {}
     };
