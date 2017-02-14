@@ -21,6 +21,8 @@
 
 namespace SimpleRPC
 {
+/****** Type information ******/
+
 class Type
 {
     std::string _className;
@@ -117,6 +119,8 @@ public:
     }
 };
 
+/****** Field meta-data ******/
+
 class Field
 {
     Type _type;
@@ -146,6 +150,8 @@ public:
 
 };
 
+/****** Reflection registry ******/
+
 class Serializable;
 struct Registry
 {
@@ -169,34 +175,122 @@ public:
 
 };
 
+/****** Type resolvers ******/
+
+/* structs */
+template <typename Item>
+struct TypeItem
+{
+    static Type type(void)
+    {
+        static_assert(std::is_convertible<Item *, Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
+        return Type(Type::TypeCode::Struct, typeid(Item).name());
+    }
+};
+
+/* arrays */
+template <typename Item>
+struct TypeItem<std::vector<Item>>
+{
+    static Type type(void)
+    {
+        /* recursive to arrau item type */
+        return Type(Type::TypeCode::Array, TypeItem<Item>::type());
+    }
+};
+
+/* signed integers */
+template <> struct TypeItem<int8_t > { static Type type(void) { return Type(Type::TypeCode::Int8 ); } };
+template <> struct TypeItem<int16_t> { static Type type(void) { return Type(Type::TypeCode::Int16); } };
+template <> struct TypeItem<int32_t> { static Type type(void) { return Type(Type::TypeCode::Int32); } };
+template <> struct TypeItem<int64_t> { static Type type(void) { return Type(Type::TypeCode::Int64); } };
+
+/* unsigned integers */
+template <> struct TypeItem<uint8_t > { static Type type(void) { return Type(Type::TypeCode::UInt8 ); } };
+template <> struct TypeItem<uint16_t> { static Type type(void) { return Type(Type::TypeCode::UInt16); } };
+template <> struct TypeItem<uint32_t> { static Type type(void) { return Type(Type::TypeCode::UInt32); } };
+template <> struct TypeItem<uint64_t> { static Type type(void) { return Type(Type::TypeCode::UInt64); } };
+
+/* floating point numbers */
+template <> struct TypeItem<float > { static Type type(void) { return Type(Type::TypeCode::Float ); } };
+template <> struct TypeItem<double> { static Type type(void) { return Type(Type::TypeCode::Double); } };
+
+/* STL string */
+template <> struct TypeItem<std::string> { static Type type(void) { return Type(Type::TypeCode::String); } };
+
+/****** Type array resolvers ******/
+
+template <typename ... Items>
+struct TypeArray;
+
+template <typename Item, typename ... Items>
+struct TypeArray<Item, Items ...>
+{
+    static std::vector<Type> type(void)
+    {
+        std::vector<Type> result;
+        std::vector<Type> remains = std::move(TypeArray<Items ...>::type());
+
+        result.push_back(TypeItem<Item>::type());
+        result.insert(result.end(), remains.begin(), remains.end());
+        return result;
+    }
+};
+
+template <>
+struct TypeArray<>
+{
+    static std::vector<Type> type(void)
+    {
+        /* final recursion, no arguments left */
+        return std::vector<Type>();
+    }
+};
+
+/****** Method meta-data ******/
+
+template <typename T>
+class Method
+{
+    Type _result;
+    std::vector<Type> _args;
+
+public:
+    explicit Method(const Type &result, std::vector<Type> &&args) : _result(result), _args(std::move(args)) {}
+
+};
+
+/****** Reflection registry descriptor ******/
+
 template <typename T>
 struct Descriptor
 {
     struct MemberData
     {
-        Type type;
-        size_t offset;
-        std::string name;
+        bool isMethod;
+        std::shared_ptr<Field> field = nullptr;
+        std::shared_ptr<Method<T>> method = nullptr;
 
     public:
-        bool isFunction;
-        bool isRequired;
-
-    public:
-        explicit MemberData() : type(Type::TypeCode::Struct), isFunction(true) {}
-        explicit MemberData(const std::string &name, const Type &type, size_t offset, bool isRequired) :
-            name(name), type(type), offset(offset), isRequired(isRequired), isFunction(false) {}
+        template <typename FieldType>
+        explicit MemberData(const std::string &name, const FieldType &field, bool isRequired) :
+            isMethod(false), field(new Field(name, TypeItem<FieldType>::type(), (uintptr_t)&field, isRequired)) {}
 
     public:
         template <typename Result, typename ... Args>
-        static MemberData makeFunction(const std::string &name, Result (T::*&&function)(Args ...))
+        explicit MemberData(Result (T::*method)(Args ...)) : isMethod(true)
         {
-            fprintf(stderr, "fp = %p\n", &function);
+            Type result = TypeItem<Result>::type();
+            std::vector<Type> args = TypeArray<Args ...>::type();
+
+            fprintf(stderr, "-----\n");
+            for (const auto &type : args)
+                fprintf(stderr, "%s\n", type.toString().c_str());
+            fprintf(stderr, "-----\n");
+
             /* WTF is this kind of grammar ??? */
-            T *instance = nullptr /* or arbitrary `T`-typed instance */;
-            Result &&res = (instance->*function)(5, "asd");
-            fprintf(stderr, "result is %s %d\n", typeid(res).name(), res);
-            return MemberData();
+//            T *instance = nullptr /* or arbitrary `T`-typed instance */;
+//            Result &&res = (instance->*method)(5, "asd");
         }
     };
 
@@ -213,59 +307,14 @@ public:
         /* fill fields data */
         for (const MemberData &info : fields)
         {
-            if (!info.isFunction)
-            {
-                meta.fields.insert({
-                    info.name,
-                    Field(
-                        info.name,
-                        info.type,
-                        info.offset,
-                        info.isRequired
-                    )
-                });
-            }
+            if (!info.isMethod)
+                meta.fields.insert({ info.field->name(), *info.field });
         }
 
         /* register to class registry */
         Registry::addClass(typeid(T).name(), meta);
     }
 };
-
-/* structs */
-template <typename T>
-inline Type resolveType(const T &)
-{
-    static_assert(std::is_convertible<T *, Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
-    return Type(Type::TypeCode::Struct, typeid(T).name());
-}
-
-/* arrays */
-template <typename T>
-inline Type resolveType(const std::vector<T> &)
-{
-    /* `Type::resolveType` won't actually use the value, so `nullptr` would be safe here */
-    return Type(Type::TypeCode::Array, resolveType(*(T *)nullptr));
-}
-
-/* signed integers */
-template <> inline Type resolveType<int8_t >(const int8_t  &) { return Type(Type::TypeCode::Int8 ); }
-template <> inline Type resolveType<int16_t>(const int16_t &) { return Type(Type::TypeCode::Int16); }
-template <> inline Type resolveType<int32_t>(const int32_t &) { return Type(Type::TypeCode::Int32); }
-template <> inline Type resolveType<int64_t>(const int64_t &) { return Type(Type::TypeCode::Int64); }
-
-/* unsigned integers */
-template <> inline Type resolveType<uint8_t >(const uint8_t  &) { return Type(Type::TypeCode::UInt8 ); }
-template <> inline Type resolveType<uint16_t>(const uint16_t &) { return Type(Type::TypeCode::UInt16); }
-template <> inline Type resolveType<uint32_t>(const uint32_t &) { return Type(Type::TypeCode::UInt32); }
-template <> inline Type resolveType<uint64_t>(const uint64_t &) { return Type(Type::TypeCode::UInt64); }
-
-/* float numbers */
-template <> inline Type resolveType<float >(const float  &) { return Type(Type::TypeCode::Float ); }
-template <> inline Type resolveType<double>(const double &) { return Type(Type::TypeCode::Double); }
-
-/* string */
-template <> inline Type resolveType<std::string>(const std::string &) { return Type(Type::TypeCode::String); }
 }
 
 #endif /* SIMPLERPC_TYPETRAITS_H */
