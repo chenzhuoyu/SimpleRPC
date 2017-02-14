@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <cxxabi.h>
 
 #include "Variant.h"
 #include "TypeInfo.h"
@@ -134,6 +135,16 @@ struct Registry
     public:
         template <typename T> T *newInstance(void) const { return static_cast<T *>(_constructor()); }
 
+    public:
+        std::string readableName(void) const
+        {
+            int status;
+            char *demangled = abi::__cxa_demangle(_name.c_str(), nullptr, nullptr, &status);
+            std::string result = demangled ? std::string(demangled) : _name;
+
+            free(demangled);
+            return result;
+        }
     };
 
 private:

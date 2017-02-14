@@ -3,12 +3,7 @@
 #ifndef SIMPLERPC_SERIALIZABLE_H
 #define SIMPLERPC_SERIALIZABLE_H
 
-#include <mutex>
-#include <unordered_set>
-
-#include <cxxabi.h>
 #include <boost/preprocessor.hpp>
-
 #include "Inspector.h"
 
 namespace SimpleRPC
@@ -18,41 +13,29 @@ typedef Internal::Method    Method;
 typedef Internal::Variant   Variant;
 typedef Internal::Registry  Registry;
 
-class Serializable
+struct Serializable
 {
-    std::string _name;
-    std::unordered_set<std::string> _names;
-
-private:
-    mutable std::mutex _mutex;
-    mutable const Internal::Registry::Meta *_meta;
-
-public:
     typedef Internal::Registry::Meta Meta;
 
 protected:
-    explicit Serializable() : _meta(nullptr) {}
-
-public:
-    bool isSet(const std::string &name) const { return _names.find(name) != _names.end(); }
-
-public:
-    const Meta &meta(void) const;
-    const std::string &name(void) const { return _name; }
+    const Meta *_meta;
 
 protected:
-    void setName(const std::string &name) { _name = name; }
-    void setField(const std::string &name) { _names.insert(name); }
+    virtual ~Serializable() {}
+    explicit Serializable() {}
 
 public:
-    std::string readableName(void) const
-    {
-        int status;
-        char *demangled = abi::__cxa_demangle(_name.c_str(), nullptr, nullptr, &status);
-        std::string result = demangled ? std::string(demangled) : _name;
+    const Meta &meta(void) const { return *_meta; }
 
-        free(demangled);
-        return result;
+};
+
+template <typename T>
+struct SerializableWrapper : public Serializable
+{
+    explicit SerializableWrapper()
+    {
+        /* load meta-data from registry */
+        _meta = &(Registry::findClass(typeid(T).name()));
     }
 };
 }
@@ -69,9 +52,9 @@ public:
 #define __SRPC_MEMBER_REFL_VAR(type, elem)              ::SimpleRPC::Internal::Descriptor<type>::MemberData(__SRPC_STRING(BOOST_PP_SEQ_ELEM(1, elem)), static_cast<type *>(nullptr)->BOOST_PP_SEQ_ELEM(1, elem)),
 
 #define defineClass(type, ...)                                                                                                          \
-    struct type final : public ::SimpleRPC::Serializable                                                                                \
+    struct type final : public ::SimpleRPC::SerializableWrapper<type>                                                                   \
     {                                                                                                                                   \
-        type() { ::SimpleRPC::Serializable::setName(typeid(type).name()); }                                                             \
+        type() {}                                                                                                                       \
         BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_DECL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                                          \
     };                                                                                                                                  \
                                                                                                                                         \

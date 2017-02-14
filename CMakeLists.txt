@@ -14,8 +14,7 @@ set(SIMPLE_RPC
         rpc/include/Serializable.h
         rpc/include/TypeInfo.h
         rpc/include/Variant.h
-        rpc/src/Inspector.cpp
-        rpc/src/Serializable.cpp)
+        rpc/src/Inspector.cpp)
 
 add_executable(SimpleRPC ${SIMPLE_RPC} main.cpp)
 target_link_libraries(SimpleRPC msgpackc)
