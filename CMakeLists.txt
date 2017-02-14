@@ -5,7 +5,6 @@ set(CMAKE_CXX_STANDARD 14)
 add_definitions(-D_BSD_SOURCE)
 
 include_directories(
-        ${CMAKE_SOURCE_DIR}/boost_lite
         ${CMAKE_SOURCE_DIR}/rpc/include)
 
 set(SIMPLE_RPC
