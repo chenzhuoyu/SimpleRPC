@@ -65,6 +65,13 @@ public:
 
 };
 
+class ClassDuplicatedError : public Exception
+{
+public:
+    explicit ClassDuplicatedError(const std::string &name) : Exception("Class \"" + name + "\" duplicated in registry") {}
+
+};
+
 class UnknownComplexTypeError : public Exception
 {
     std::string _typeName;

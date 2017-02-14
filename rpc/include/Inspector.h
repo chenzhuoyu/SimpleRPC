@@ -74,8 +74,8 @@ private:
     std::vector<Type> _args;
 
 public:
-    explicit Method(const char *name, Type &&result, std::vector<Type> &&args, Proxy &&proxy) :
-        _name(name), _args(std::move(args)), _result(std::move(result)), _proxy(std::move(proxy)) {}
+    explicit Method(const char *name, const char *signature, Type &&result, std::vector<Type> &&args, Proxy &&proxy) :
+        _name(name + std::string("::") + signature), _args(std::move(args)), _result(std::move(result)), _proxy(std::move(proxy)) {}
 
 public:
     const Type &result(void) const { return _result; }
@@ -198,8 +198,9 @@ public:
 
     public:
         template <typename Result, typename ... Args>
-        explicit MemberData(Result (T::*&&method)(Args ...)) :
+        explicit MemberData(const char *name, Result (T::*&&method)(Args ...)) :
             isMethod(true), method(new Method(
+                name,
                 typeid(method).name(),
                 TypeItem<Result>::type(),
                 TypeArray<Args ...>::type(),

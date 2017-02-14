@@ -7,6 +7,8 @@ void SimpleRPC::Internal::Registry::addClass(const std::string &name, std::share
 {
     if (_registry.find(name) == _registry.end())
         _registry.insert({ name, meta });
+    else
+        throw SimpleRPC::Exceptions::ClassDuplicatedError(name);
 }
 
 const SimpleRPC::Internal::Registry::Meta &SimpleRPC::Internal::Registry::findClass(const std::string &name)
