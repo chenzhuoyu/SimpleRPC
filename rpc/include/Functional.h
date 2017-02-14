@@ -13,9 +13,11 @@
 
 namespace SimpleRPC
 {
+namespace Internal
+{
 namespace Functional
 {
-namespace Internal
+namespace Implementation
 {
 template <typename T, typename Method, class ArgsTuple, size_t ... I>
 constexpr auto applyImpl(T *self, Method &&method, ArgsTuple &&args, std::index_sequence<I ...>)
@@ -27,12 +29,13 @@ constexpr auto applyImpl(T *self, Method &&method, ArgsTuple &&args, std::index_
 template <typename T, typename F, typename Tuple>
 constexpr auto apply(T *self, F &&f, Tuple &&t)
 {
-    return Internal::applyImpl(
+    return Implementation::applyImpl(
         self,
         std::forward<F>(f),
         std::forward<Tuple>(t),
         std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>()
     );
+}
 }
 }
 }

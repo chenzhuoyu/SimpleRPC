@@ -1,37 +1,40 @@
 #include <iostream>
 #include "Serializable.h"
 
-//defineClass(Test,
-//    defineField(int, a),
-//    defineField(std::string, b),
-//
-//    declareMethod(int, test, long x, std::string y = std::string("Asdf"))
-//)
+defineClass(Test,
+    defineField(int, a),
+    defineField(std::string, b),
 
-struct Test final : public ::SimpleRPC::Serializable {
-    Test() { ::SimpleRPC::Serializable::setName(typeid(Test).name()); }
-    int a;
-    std::string b;
-    int test(long x, std::string y);
-};
-static ::SimpleRPC::Descriptor<Test> __SimpleRPC_Test_Descriptor_DO_NOT_TOUCH_THIS_VARIABLE__ [[gnu::unused]] ({
-    ::SimpleRPC::Descriptor<Test>::MemberData("a", static_cast<Test *>(nullptr)->a),
-    ::SimpleRPC::Descriptor<Test>::MemberData("b", static_cast<Test *>(nullptr)->b),
-    ::SimpleRPC::Descriptor<Test>::MemberData(&Test::test),
-});
+    declareMethod(int, test, long x, std::string y)
+)
 
 int Test::test(long x, std::string y)
 {
     fprintf(stderr, "=====\n");
-    fprintf(stderr, "%p %ld %s\n", this, x, y.c_str());
+    fprintf(stderr, "this: %p, this->a: %d, x: %ld, y: %s, this->b: %s\n", this, a, x, y.c_str(), b.c_str());
     fprintf(stderr, "=====\n");
-    return 123;
+    return 456123;
 }
 
 int main()
 {
-    Test test;
-    for (const auto &pair : test.meta().fields)
-        std::cerr << pair.second.type().toString() << " " << pair.second.name() << "; /* offset : " << pair.second.offset() << " */" << std::endl;
+    /* class lookup */
+    const SimpleRPC::Serializable::Meta &meta = SimpleRPC::Internal::Registry::findClass("4Test");
+
+    /* instaniate using reflection */
+    std::shared_ptr<Test> test(meta.newInstance<Test>());
+
+    /* set field using reflection */
+    meta.fields().at("a")->data<int>(test.get()) = 789;
+    meta.fields().at("b")->data<std::string>(test.get()) = "test-reflect";
+
+    /* method lookup */
+    const std::shared_ptr<SimpleRPC::Internal::Method> &method = meta.methods().at("M4TestFilNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEE");
+
+    /* print method's return type and name signature */
+    fprintf(stderr, "%s %s::%s(...)\n", method->result().toString().c_str(), meta.name().c_str(), method->name().c_str());
+
+    /* invoke method using reflection */
+    fprintf(stderr, "result: %d\n", method->invoke(test.get(), SimpleRPC::Internal::Variant::array(123, "hello, world")).as<int>());
     return 0;
 }

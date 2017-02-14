@@ -29,10 +29,17 @@ public:
 
 };
 
-class ArrayIndexError : public Exception
+class NameError : public Exception
 {
 public:
-    explicit ArrayIndexError(ssize_t index) : Exception("Array index out of bound: %lld" + std::to_string(index)) {}
+    explicit NameError(const std::string &name) : Exception("No such name: " + name) {}
+
+};
+
+class IndexError : public Exception
+{
+public:
+    explicit IndexError(ssize_t index) : Exception("Array index out of bound: " + std::to_string(index)) {}
 
 };
 
