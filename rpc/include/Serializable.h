@@ -13,6 +13,11 @@
 
 namespace SimpleRPC
 {
+typedef Internal::Field     Field;
+typedef Internal::Method    Method;
+typedef Internal::Variant   Variant;
+typedef Internal::Registry  Registry;
+
 class Serializable
 {
     std::string _name;
