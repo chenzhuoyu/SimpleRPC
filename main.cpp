@@ -15,8 +15,8 @@ struct Test : public ::SimpleRPC::Serializable {
     int test(long x, std::string y);
 };
 static ::SimpleRPC::Descriptor<Test> __SimpleRPC_Test_Descriptor_DO_NOT_TOUCH_THIS_VARIABLE__ [[maybe_unused]] ({
-    ::SimpleRPC::Descriptor<Test>::MemberData("a", reinterpret_cast<Test*>(nullptr)->a, true),
-    ::SimpleRPC::Descriptor<Test>::MemberData("b", reinterpret_cast<Test*>(nullptr)->b, true),
+    ::SimpleRPC::Descriptor<Test>::MemberData("a", static_cast<Test*>(nullptr)->a, true),
+    ::SimpleRPC::Descriptor<Test>::MemberData("b", static_cast<Test*>(nullptr)->b, true),
     ::SimpleRPC::Descriptor<Test>::MemberData(&Test::test)
 });
 

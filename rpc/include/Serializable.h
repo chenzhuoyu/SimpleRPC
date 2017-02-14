@@ -57,8 +57,8 @@ public:
 #define __SRPC_MEMBER_DECL_VAR(type, elem)              BOOST_PP_SEQ_ELEM(3, elem);
 #define __SRPC_MEMBER_REFL_VAR(type, elem)              BOOST_PP_CAT(__SRPC_MEMBER_REFL_VAR_, BOOST_PP_SEQ_ELEM(1, elem))(type, BOOST_PP_SEQ_ELEM(2, elem))
 
-#define __SRPC_MEMBER_REFL_VAR_REQ(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), reinterpret_cast<type *>(nullptr)->field, true),
-#define __SRPC_MEMBER_REFL_VAR_OPT(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), reinterpret_cast<type *>(nullptr)->field, false),
+#define __SRPC_MEMBER_REFL_VAR_REQ(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), static_cast<type *>(nullptr)->field, true),
+#define __SRPC_MEMBER_REFL_VAR_OPT(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), static_cast<type *>(nullptr)->field, false),
 
 #define defineClass(type, ...)                                                                                  \
     struct type : public ::SimpleRPC::Serializable                                                              \
