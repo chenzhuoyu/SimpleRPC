@@ -120,14 +120,15 @@ public:
 class Field
 {
     Type _type;
-    bool _required;
+    bool _isRequired;
 
 private:
     size_t _offset;
     std::string _name;
 
 public:
-    explicit Field(const std::string &name, const Type &type, size_t offset, bool required) : _type(type), _name(name), _offset(offset), _required(required) {}
+    explicit Field(const std::string &name, const Type &type, size_t offset, bool isRequired) :
+        _type(type), _name(name), _offset(offset), _isRequired(isRequired) {}
 
 public:
     size_t offset(void) const { return _offset; }
@@ -137,7 +138,7 @@ public:
     const Type &type(void) const { return _type; }
 
 public:
-    bool isRequired(void) const { return _required; }
+    bool isRequired(void) const { return _isRequired; }
 
 public:
     template <typename T>
@@ -174,19 +175,27 @@ struct Descriptor
     struct MemberData
     {
         Type type;
-        bool required;
         size_t offset;
         std::string name;
 
     public:
-        explicit MemberData() : type(Type::TypeCode::Struct) {}
-        explicit MemberData(const std::string &name, const Type &type, size_t offset, bool required) : name(name), type(type), offset(offset), required(required) {}
+        bool isFunction;
+        bool isRequired;
 
     public:
-        template <typename Function>
-        static MemberData makeFunction(Function function)
+        explicit MemberData() : type(Type::TypeCode::Struct), isFunction(true) {}
+        explicit MemberData(const std::string &name, const Type &type, size_t offset, bool isRequired) :
+            name(name), type(type), offset(offset), isRequired(isRequired), isFunction(false) {}
+
+    public:
+        template <typename Result, typename ... Args>
+        static MemberData makeFunction(const std::string &name, Result (T::*&&function)(Args ...))
         {
             fprintf(stderr, "fp = %p\n", &function);
+            /* WTF is this kind of grammar ??? */
+            T *instance = nullptr /* or arbitrary `T`-typed instance */;
+            Result &&res = (instance->*function)(5, "asd");
+            fprintf(stderr, "result is %s %d\n", typeid(res).name(), res);
             return MemberData();
         }
     };
@@ -204,15 +213,18 @@ public:
         /* fill fields data */
         for (const MemberData &info : fields)
         {
-            meta.fields.insert({
-                info.name,
-                Field(
+            if (!info.isFunction)
+            {
+                meta.fields.insert({
                     info.name,
-                    info.type,
-                    info.offset,
-                    info.required
-                )
-            });
+                    Field(
+                        info.name,
+                        info.type,
+                        info.offset,
+                        info.isRequired
+                    )
+                });
+            }
         }
 
         /* register to class registry */
@@ -222,7 +234,7 @@ public:
 
 /* structs */
 template <typename T>
-inline Type resolve(const T &)
+inline Type resolveType(const T &)
 {
     static_assert(std::is_convertible<T *, Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
     return Type(Type::TypeCode::Struct, typeid(T).name());
@@ -230,30 +242,30 @@ inline Type resolve(const T &)
 
 /* arrays */
 template <typename T>
-inline Type resolve(const std::vector<T> &)
+inline Type resolveType(const std::vector<T> &)
 {
-    /* `Type::resolve` won't actually use the value, so `nullptr` would be safe here */
-    return Type(Type::TypeCode::Array, resolve(*(T *)nullptr));
+    /* `Type::resolveType` won't actually use the value, so `nullptr` would be safe here */
+    return Type(Type::TypeCode::Array, resolveType(*(T *)nullptr));
 }
 
 /* signed integers */
-template <> inline Type resolve<int8_t >(const int8_t  &) { return Type(Type::TypeCode::Int8 ); }
-template <> inline Type resolve<int16_t>(const int16_t &) { return Type(Type::TypeCode::Int16); }
-template <> inline Type resolve<int32_t>(const int32_t &) { return Type(Type::TypeCode::Int32); }
-template <> inline Type resolve<int64_t>(const int64_t &) { return Type(Type::TypeCode::Int64); }
+template <> inline Type resolveType<int8_t >(const int8_t  &) { return Type(Type::TypeCode::Int8 ); }
+template <> inline Type resolveType<int16_t>(const int16_t &) { return Type(Type::TypeCode::Int16); }
+template <> inline Type resolveType<int32_t>(const int32_t &) { return Type(Type::TypeCode::Int32); }
+template <> inline Type resolveType<int64_t>(const int64_t &) { return Type(Type::TypeCode::Int64); }
 
 /* unsigned integers */
-template <> inline Type resolve<uint8_t >(const uint8_t  &) { return Type(Type::TypeCode::UInt8 ); }
-template <> inline Type resolve<uint16_t>(const uint16_t &) { return Type(Type::TypeCode::UInt16); }
-template <> inline Type resolve<uint32_t>(const uint32_t &) { return Type(Type::TypeCode::UInt32); }
-template <> inline Type resolve<uint64_t>(const uint64_t &) { return Type(Type::TypeCode::UInt64); }
+template <> inline Type resolveType<uint8_t >(const uint8_t  &) { return Type(Type::TypeCode::UInt8 ); }
+template <> inline Type resolveType<uint16_t>(const uint16_t &) { return Type(Type::TypeCode::UInt16); }
+template <> inline Type resolveType<uint32_t>(const uint32_t &) { return Type(Type::TypeCode::UInt32); }
+template <> inline Type resolveType<uint64_t>(const uint64_t &) { return Type(Type::TypeCode::UInt64); }
 
 /* float numbers */
-template <> inline Type resolve<float >(const float  &) { return Type(Type::TypeCode::Float ); }
-template <> inline Type resolve<double>(const double &) { return Type(Type::TypeCode::Double); }
+template <> inline Type resolveType<float >(const float  &) { return Type(Type::TypeCode::Float ); }
+template <> inline Type resolveType<double>(const double &) { return Type(Type::TypeCode::Double); }
 
 /* string */
-template <> inline Type resolve<std::string>(const std::string &) { return Type(Type::TypeCode::String); }
+template <> inline Type resolveType<std::string>(const std::string &) { return Type(Type::TypeCode::String); }
 }
 
 #endif /* SIMPLERPC_TYPETRAITS_H */
