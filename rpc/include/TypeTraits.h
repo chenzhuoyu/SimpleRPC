@@ -4,6 +4,7 @@
 #define SIMPLERPC_TYPETRAITS_H
 
 #include <mutex>
+#include <tuple>
 #include <memory>
 #include <string>
 #include <vector>
@@ -16,8 +17,10 @@
 #include <cxxabi.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <msgpack.hpp>
 
 #include "Exceptions.h"
+#include "Functional.h"
 
 namespace SimpleRPC
 {
@@ -139,15 +142,11 @@ public:
 class Field
 {
     Type _type;
-    bool _isRequired;
-
-private:
     size_t _offset;
     std::string _name;
 
 public:
-    explicit Field(const std::string &name, const Type &type, size_t offset, bool isRequired) :
-        _type(type), _name(name), _offset(offset), _isRequired(isRequired) {}
+    explicit Field(const std::string &name, const Type &type, size_t offset) : _type(type), _name(name), _offset(offset) {}
 
 public:
     size_t offset(void) const { return _offset; }
@@ -155,9 +154,6 @@ public:
 
 public:
     const Type &type(void) const { return _type; }
-
-public:
-    bool isRequired(void) const { return _isRequired; }
 
 public:
     template <typename T>
@@ -262,16 +258,45 @@ struct TypeArray<>
     }
 };
 
+/****** Parameter tuple expanders ******/
+
+template <typename ... Args>
+struct ParamTuple;
+
+template <typename Item, typename ... Items>
+struct ParamTuple<Item, Items ...>
+{
+    static std::tuple<Item, Items ...> expand(msgpack::object_array &array, int pos = 0)
+    {
+        return std::tuple_cat(
+            std::make_tuple<Item>(array.ptr[pos].as<Item>()),
+            ParamTuple<Items ...>::expand(array, pos + 1)
+        );
+    }
+};
+
+template <>
+struct ParamTuple<>
+{
+    static std::tuple<> expand(msgpack::object_array &, int)
+    {
+        /* final recursion, no arguments left */
+        return std::tuple<>();
+    }
+};
+
 /****** Method meta-data ******/
 
 template <typename T>
 class Method
 {
     Type _result;
+    std::string _name;
     std::vector<Type> _args;
 
 public:
-    explicit Method(const Type &result, std::vector<Type> &&args) : _result(result), _args(std::move(args)) {}
+    explicit Method(Type &&result, std::string &&name, std::vector<Type> &&args) :
+        _args(std::move(args)), _name(std::move(name)), _result(std::move(result)) {}
 
 };
 
@@ -288,20 +313,38 @@ struct Descriptor
 
     public:
         template <typename FieldType>
-        explicit MemberData(const std::string &name, const FieldType &field, bool isRequired) :
-            isMethod(false), field(new Field(name, TypeItem<FieldType>::type(), reinterpret_cast<uintptr_t>(&field), isRequired)) {}
+        explicit MemberData(const std::string &name, const FieldType &field) :
+            isMethod(false), field(new Field(name, TypeItem<FieldType>::type(), reinterpret_cast<uintptr_t>(&field))) {}
 
     public:
         template <typename Result, typename ... Args>
-        explicit MemberData(Result (T::*method)(Args ...)) : isMethod(true)
+        explicit MemberData(Result (T::*&&method)(Args ...)) : isMethod(true)
         {
             Type result = TypeItem<Result>::type();
+            std::string name = typeid(method).name();
             std::vector<Type> args = TypeArray<Args ...>::type();
 
+            std::function<msgpack::object(void *, msgpack::object_array)> proxy = [&](void *self, msgpack::object_array argv)
+            {
+                int x = Functional::apply((T *)self, method, ParamTuple<Args ...>::expand(argv));
+                fprintf(stderr, "%d\n", x);
+                return msgpack::object();
+            };
+
+            msgpack::type::tuple<int, std::string> arg(150, "asdf");
+            msgpack::sbuffer sbuf;
+            msgpack::pack(sbuf, arg);
+            fprintf(stderr, "%ld\n", sbuf.size());
+            msgpack::zone z;
+            msgpack::object obj = msgpack::unpack(sbuf.data(), sbuf.size(), z, nullptr);
+            fprintf(stderr, "%d\n", obj.type);
+            proxy((void *)0x12345, obj.via.array);
+
             fprintf(stderr, "-----\n");
+            fprintf(stderr, "%s %s ( ", result.toString().c_str(), name.c_str());
             for (const auto &type : args)
-                fprintf(stderr, "%s\n", type.toString().c_str());
-            fprintf(stderr, "-----\n");
+                fprintf(stderr, "%s, ", type.toString().c_str());
+            fprintf(stderr, ")\n-----\n");
 
             /* WTF is this kind of grammar ??? */
 //            T *instance = nullptr /* or arbitrary `T`-typed instance */;

@@ -54,46 +54,24 @@ public:
 #define __SRPC_MEMBER_DECL(r, data, elem)               BOOST_PP_CAT(__SRPC_MEMBER_DECL_, BOOST_PP_SEQ_ELEM(0, elem))(data, elem)
 #define __SRPC_MEMBER_REFL(r, data, elem)               BOOST_PP_CAT(__SRPC_MEMBER_REFL_, BOOST_PP_SEQ_ELEM(0, elem))(data, elem)
 
-#define __SRPC_MEMBER_DECL_VAR(type, elem)              BOOST_PP_SEQ_ELEM(3, elem);
-#define __SRPC_MEMBER_REFL_VAR(type, elem)              BOOST_PP_CAT(__SRPC_MEMBER_REFL_VAR_, BOOST_PP_SEQ_ELEM(1, elem))(type, BOOST_PP_SEQ_ELEM(2, elem))
+#define __SRPC_MEMBER_DECL_VAR(type, elem)              BOOST_PP_SEQ_ELEM(2, elem);
+#define __SRPC_MEMBER_REFL_VAR(type, elem)              ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(BOOST_PP_SEQ_ELEM(1, elem)), static_cast<type *>(nullptr)->BOOST_PP_SEQ_ELEM(1, elem)),
 
-#define __SRPC_MEMBER_REFL_VAR_REQ(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), static_cast<type *>(nullptr)->field, true),
-#define __SRPC_MEMBER_REFL_VAR_OPT(type, field)         ::SimpleRPC::Descriptor<type>::MemberData(__SRPC_STRING(field), static_cast<type *>(nullptr)->field, false),
-
-#define defineClass(type, ...)                                                                                  \
-    struct type : public ::SimpleRPC::Serializable                                                              \
-    {                                                                                                           \
-        type() { ::SimpleRPC::Serializable::setName(typeid(type).name()); }                                     \
-        BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_DECL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                  \
-    };                                                                                                          \
-                                                                                                                \
-    static ::SimpleRPC::Descriptor<type> __SimpleRPC_ ## type ## _Descriptor_DO_NOT_TOUCH_THIS_VARIABLE__({     \
-        BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_REFL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                  \
+#define defineClass(type, ...)                                                                                                  \
+    struct type final : public ::SimpleRPC::Serializable                                                                        \
+    {                                                                                                                           \
+        type() { ::SimpleRPC::Serializable::setName(typeid(type).name()); }                                                     \
+        BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_DECL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                                  \
+    };                                                                                                                          \
+                                                                                                                                \
+    static ::SimpleRPC::Descriptor<type> __SimpleRPC_ ## type ## _Descriptor_DO_NOT_TOUCH_THIS_VARIABLE__ [[gnu::unused]] ({    \
+        BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_REFL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                                  \
     });
-
-#define __SRPC_DEFINE_FIELD_REQ(type, name)             (VAR)(REQ)(name)(type name)
-#define __SRPC_DEFINE_FIELD_OPT(type, name, value)      (VAR)(OPT)(name)(type name = value)
-
-#define defineField(...)                                \
-    __SRPC_MACRO(                                       \
-        __VA_ARGS__,                                    \
-        __SRPC_DEFINE_FIELD_OPT,                        \
-        __SRPC_DEFINE_FIELD_REQ                         \
-    )(__VA_ARGS__)
-
-#define __SRPC_DEFINE_ARG_REQ(type, name)               (REQ)(name)(type name)
-#define __SRPC_DEFINE_ARG_OPT(type, name, value)        (OPT)(name)(type name = value)
-
-#define defineArg(...)                                  \
-    __SRPC_MACRO(                                       \
-        __VA_ARGS__,                                    \
-        __SRPC_DEFINE_ARG_OPT,                          \
-        __SRPC_DEFINE_ARG_REQ                           \
-    )(__VA_ARGS__)
 
 #define __SRPC_MEMBER_DECL_FUNC(type, elem)             BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_ELEM(3, elem)));
 #define __SRPC_MEMBER_REFL_FUNC(type, elem)             ::SimpleRPC::Descriptor<Test>::MemberData(&type::BOOST_PP_SEQ_ELEM(2, elem)),
 
-#define defineMethod(ret, name, ...)                    (FUNC)(ret)(name)(BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
+#define defineField(type, name)                         (VAR)(name)(type name)
+#define declareMethod(ret, name, ...)                   (FUNC)(ret)(name)(BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))
 
 #endif /* SIMPLERPC_SERIALIZABLE_H */
