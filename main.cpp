@@ -35,6 +35,6 @@ int main()
     fprintf(stderr, "%s %s::%s(...)\n", method->result().toString().c_str(), meta.name().c_str(), method->name().c_str());
 
     /* invoke method using reflection */
-    fprintf(stderr, "result: %d\n", method->invoke(test.get(), SimpleRPC::Variant::array(123, "hello, world")).as<int>());
+    fprintf(stderr, "result: %d\n", method->invoke(test.get(), SimpleRPC::Variant::array(123, "hello, world")).get<int>());
     return 0;
 }

@@ -43,6 +43,21 @@ public:
 
 };
 
+class ValueError : public Exception
+{
+public:
+    explicit ValueError(const std::string &message) : Exception(message) {}
+
+};
+
+class ArgumentError : public Exception
+{
+public:
+    explicit ArgumentError(size_t formal, size_t actual) :
+        Exception("Method declared as " + std::to_string(formal) + " parameter(s) but got " + std::to_string(actual)) {}
+
+};
+
 class ClassNotFoundError : public Exception
 {
 public:

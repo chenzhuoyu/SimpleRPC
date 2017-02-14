@@ -15,8 +15,8 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "TypeInfo.h"
 #include "Variant.h"
+#include "TypeInfo.h"
 #include "Exceptions.h"
 #include "Functional.h"
 
@@ -161,7 +161,7 @@ struct ParamTuple<Item, Items ...>
     static std::tuple<Item, Items ...> expand(const Variant &array, int pos = 0)
     {
         return std::tuple_cat(
-            std::make_tuple<Item>(static_cast<Item>(array[pos].as<Item>())),
+            std::make_tuple<Item>(array[pos].get<Item>()),
             ParamTuple<Items ...>::expand(array, pos + 1)
         );
     }
@@ -205,7 +205,15 @@ public:
                 TypeArray<Args ...>::type(),
                 [=](::SimpleRPC::Serializable *self, const Variant &argv)
                 {
-                    /* simple proxy lambda to invoke target method with parameter array */
+                    /* check for valid parameter pack type */
+                    if (argv.type() != Type::TypeCode::Array)
+                        throw Exceptions::TypeError("Invoke parameter pack must be array");
+
+                    /* check for parameter count */
+                    if (argv.get<const Variant::Array &>().size() != sizeof ... (Args))
+                        throw Exceptions::ArgumentError(sizeof ... (Args), argv.get<const Variant::Array &>().size());
+
+                    /* invoke target method with parameter array */
                     return Variant(Functional::apply(static_cast<T *>(self), method, ParamTuple<Args ...>::expand(argv)));
                 }
             )) {}
