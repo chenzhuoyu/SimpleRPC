@@ -24,6 +24,7 @@ namespace SimpleRPC
 {
 /* forward declaration of class `Serializable` must be put here, it is not belonging to `Internal` namespace */
 class Serializable;
+
 namespace Internal
 {
 /****** Field meta-data ******/
