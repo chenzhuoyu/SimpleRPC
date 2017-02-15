@@ -27,6 +27,8 @@ constexpr auto applyImpl(T *self, Method &&method, ArgsTuple &&args, std::index_
 }
 }
 
+/** compile-time maximum **/
+
 template <typename T>
 constexpr T &&max(T &&a, T &&b)
 {
@@ -38,6 +40,8 @@ constexpr T &&max(T &&a, Args && ... args)
 {
     return max(std::forward<T>(a), max(std::forward<Args>(args) ...));
 }
+
+/** self-implemented and simplified version of `std::apply()` (since C++/17) **/
 
 template <typename T, typename F, typename Tuple>
 constexpr auto apply(T *self, F &&f, Tuple &&t)

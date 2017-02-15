@@ -38,21 +38,21 @@ int main()
     meta.fields().at("b")->data<std::string>(test.get()) = "test-reflect";
 
     /* method lookup, that mysterious method name is it's signature, please STFG (Search The Fucking Google) for more details */
-    const std::shared_ptr<SimpleRPC::Method> &method1 = meta.methods().at("test::M4TestFilNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEE");
+    const std::shared_ptr<SimpleRPC::Method> &method1 = meta.methods().at(std::string("test::") + typeid(&Test::test).name());
 
     /* print method's return type and name signature */
     fprintf(stderr, "%s %s::%s(...)\n", method1->result().toString().c_str(), meta.name().c_str(), method1->name().c_str());
 
     /* invoke method using reflection */
-    fprintf(stderr, "result: %d\n", method1->invoke(test.get(), SimpleRPC::Variant::array(123, "hello, world")).get<int>());
+    fprintf(stderr, "result: %d\n", method1->invoke(test.get(), SimpleRPC::Variant::array((int64_t)123, "hello, world")).get<int>());
 
     /* method lookup, that mysterious method name is it's signature, please STFG (Search The Fucking Google) for more details */
-    const std::shared_ptr<SimpleRPC::Method> &method2 = meta.methods().at("test2::M4TestFilNSt7__cxx1112basic_stringIcSt11char_traitsIcESaIcEEEE");
+    const std::shared_ptr<SimpleRPC::Method> &method2 = meta.methods().at(std::string("test2::") + typeid(&Test::test).name());
 
     /* print method's return type and name signature */
     fprintf(stderr, "%s %s::%s(...)\n", method2->result().toString().c_str(), meta.name().c_str(), method1->name().c_str());
 
     /* invoke method using reflection */
-    fprintf(stderr, "result: %d\n", method2->invoke(test.get(), SimpleRPC::Variant::array(999, "sdfdfg")).get<int>());
+    fprintf(stderr, "result: %d\n", method2->invoke(test.get(), SimpleRPC::Variant::array((int64_t)999, "sdfdfg")).get<int>());
     return 0;
 }

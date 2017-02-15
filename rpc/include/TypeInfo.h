@@ -5,7 +5,9 @@
 
 #include <string>
 #include <memory>
+
 #include "Exceptions.h"
+#include "Functional.h"
 
 namespace SimpleRPC
 {
@@ -133,14 +135,65 @@ public:
 /* forward declaration of class Serializable */
 class Serializable;
 
-/* structs */
+/* type size container */
+template <size_t size>
+struct TypeSize
+{
+    static Type signedType(void)
+    {
+        /* these `if` statement would be optimized away by compiler */
+        if (size == sizeof(int8_t )) return Type::TypeCode::Int8;
+        if (size == sizeof(int16_t)) return Type::TypeCode::Int16;
+        if (size == sizeof(int32_t)) return Type::TypeCode::Int32;
+        if (size == sizeof(int64_t)) return Type::TypeCode::Int64;
+
+        /* should never reaches here */
+        static_assert(size == sizeof(int8_t) || size == sizeof(int16_t) || size == sizeof(int32_t) || size == sizeof(int64_t), "Unknown signed integer size");
+        abort();
+    }
+
+    static Type unsignedType(void)
+    {
+        /* these `if` statement would be optimized away by compiler */
+        if (size == sizeof(uint8_t )) return Type::TypeCode::UInt8;
+        if (size == sizeof(uint16_t)) return Type::TypeCode::UInt16;
+        if (size == sizeof(uint32_t)) return Type::TypeCode::UInt32;
+        if (size == sizeof(uint64_t)) return Type::TypeCode::UInt64;
+
+        /* should never reaches here */
+        static_assert(size == sizeof(uint8_t) || size == sizeof(uint16_t) || size == sizeof(uint32_t) || size == sizeof(uint64_t), "Unknown unsigned integer size");
+        abort();
+    }
+};
+
+template <bool isSigned, bool isUnsigned, bool isStructLike, typename Item>
+struct TypeHelper
+{
+    static Type type(void)
+    {
+        /* these `if` statement would be optimized away by compiler */
+        if (isSigned)       return TypeSize<sizeof(Item)>::signedType();
+        if (isUnsigned)     return TypeSize<sizeof(Item)>::unsignedType();
+        if (isStructLike)   return Type(Type::TypeCode::Struct, typeid(Item).name());
+
+        /* should never reaches here */
+        static_assert(isSigned || isUnsigned || isStructLike, "Cannot serialize or deserialize arbitrary type");
+        abort();
+    }
+};
+
 template <typename Item>
 struct TypeItem
 {
     static Type type(void)
     {
-        static_assert(std::is_convertible<Item *, Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
-        return Type(Type::TypeCode::Struct, typeid(Item).name());
+        /* invoke type helper for detailed type information */
+        return TypeHelper<
+            std::is_signed<Item>::value,
+            std::is_unsigned<Item>::value,
+            std::is_convertible<Item *, Serializable *>::value,
+            Item
+        >::type();
     }
 };
 
@@ -154,18 +207,6 @@ struct TypeItem<std::vector<Item>>
         return Type(Type::TypeCode::Array, TypeItem<Item>::type());
     }
 };
-
-/* signed integers */
-template <> struct TypeItem<int8_t > { static Type type(void) { return Type::TypeCode::Int8; } };
-template <> struct TypeItem<int16_t> { static Type type(void) { return Type::TypeCode::Int16; } };
-template <> struct TypeItem<int32_t> { static Type type(void) { return Type::TypeCode::Int32; } };
-template <> struct TypeItem<int64_t> { static Type type(void) { return Type::TypeCode::Int64; } };
-
-/* unsigned integers */
-template <> struct TypeItem<uint8_t > { static Type type(void) { return Type::TypeCode::UInt8; } };
-template <> struct TypeItem<uint16_t> { static Type type(void) { return Type::TypeCode::UInt16; } };
-template <> struct TypeItem<uint32_t> { static Type type(void) { return Type::TypeCode::UInt32; } };
-template <> struct TypeItem<uint64_t> { static Type type(void) { return Type::TypeCode::UInt64; } };
 
 /* floating point numbers */
 template <> struct TypeItem<float > { static Type type(void) { return Type::TypeCode::Float; } };
@@ -184,12 +225,11 @@ struct TypeArray<Item, Items ...>
 {
     static std::vector<Type> type(void)
     {
-        std::vector<Type> result;
-        std::vector<Type> remains = std::move(TypeArray<Items ...>::type());
+        auto first = std::move(TypeItem<Item>::type());
+        auto remains = std::move(TypeArray<Items ...>::type());
 
-        result.push_back(TypeItem<Item>::type());
-        result.insert(result.end(), remains.begin(), remains.end());
-        return result;
+        remains.insert(remains.begin(), first);
+        return remains;
     }
 };
 

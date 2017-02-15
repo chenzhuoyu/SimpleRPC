@@ -24,7 +24,7 @@ namespace SimpleRPC
 {
 namespace Internal
 {
-class Variant
+class Variant final
 {
     union
     {
@@ -140,46 +140,111 @@ public:
 public:
     Type::TypeCode type(void) const { return _type; }
 
+private:
+    template <size_t size, typename T>
+    inline T getSigned(void) const
+    {
+        /* these `if` statement would be optimized away by compiler since `size` is literally a constant */
+        if (size == sizeof(int8_t))
+        {
+            if (_type == Type::TypeCode::Int8)
+                return static_cast<T>(_s8);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `int8_t`");
+        }
+        else if (size == sizeof(int16_t))
+        {
+            if (_type == Type::TypeCode::Int16)
+                return static_cast<T>(_s16);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `int16_t`");
+        }
+        else if (size == sizeof(int32_t))
+        {
+            if (_type == Type::TypeCode::Int32)
+                return static_cast<T>(_s32);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `int32_t`");
+        }
+        else if (size == sizeof(int64_t))
+        {
+            if (_type == Type::TypeCode::Int64)
+                return static_cast<T>(_s64);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `int64_t`");
+        }
+        else
+        {
+            /* should never reaches here */
+            static_assert(size == sizeof(int8_t) || size == sizeof(int16_t) || size == sizeof(int32_t) || size == sizeof(int64_t), "Unknown signed integer size");
+            abort();
+        }
+    }
+
+private:
+    template <size_t size, typename T>
+    inline T getUnsigned(void) const
+    {
+        /* these `if` statement would be optimized away by compiler since `size` is literally a constant */
+        if (size == sizeof(uint8_t))
+        {
+            if (_type == Type::TypeCode::UInt8)
+                return static_cast<T>(_u8);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `uint8_t`");
+        }
+        else if (size == sizeof(uint16_t))
+        {
+            if (_type == Type::TypeCode::UInt16)
+                return static_cast<T>(_u16);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `uint16_t`");
+        }
+        else if (size == sizeof(uint32_t))
+        {
+            if (_type == Type::TypeCode::UInt32)
+                return static_cast<T>(_u32);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `uint32_t`");
+        }
+        else if (size == sizeof(uint64_t))
+        {
+            if (_type == Type::TypeCode::UInt64)
+                return static_cast<T>(_u64);
+            else
+                throw Exceptions::TypeError(toString() + " is not an `uint64_t`");
+        }
+        else
+        {
+            /* should never reaches here */
+            static_assert(size == sizeof(uint8_t) || size == sizeof(uint16_t) || size == sizeof(uint32_t) || size == sizeof(uint64_t), "Unknown unsigned integer size");
+            abort();
+        }
+    }
+
+private:
+    template <bool isSigned, bool isUnsigned, typename T>
+    inline T getIntegers(void) const
+    {
+        /* these `if` statement would be optimized away by compiler */
+        if (isSigned)   return getSigned<sizeof(T), T>();
+        if (isUnsigned) return getUnsigned<sizeof(T), T>();
+
+        /* should never reaches here */
+        static_assert(isSigned || isUnsigned, "Cannot convert to arbitrary types");
+        abort();
+    }
+
 public:
-    template <typename T> inline    T get(void) const;
-    template <typename T> inline void set(const T &value) { assign(Variant(value)); }
-
-private:
-    template <typename R, typename T, typename BL, typename BU>
-    inline R rangeCheckF(const std::string &name, T value, BL min, BU max) const
+    template <typename T>
+    inline T get(void) const
     {
-        if (value > max)
-            throw Exceptions::ValueError("Float overflow [" + name + "]: " + toString());
-        else if (value < min)
-            throw Exceptions::ValueError("Float underflow [" + name + "]: " + toString());
-        else
-            return static_cast<R>(value);
-    }
-
-private:
-    template <typename R, typename T, typename BL, typename BU>
-    inline R rangeCheckI(const std::string &name, T value, BL min, BU max) const
-    {
-        if (value > max)
-            throw Exceptions::ValueError("Integer overflow [" + name + "]: " + toString());
-        else if (value < min)
-            throw Exceptions::ValueError("Integer underflow [" + name + "]: " + toString());
-        else
-            return static_cast<R>(value);
-    }
-
-private:
-    template <typename R, typename T, typename BL, typename BU>
-    inline R rangeCheckFI(const std::string &name, T value, BL min, BU max) const
-    {
-        if (value > max)
-            throw Exceptions::ValueError("Integer overflow [" + name + "]: " + toString());
-        else if (value < min)
-            throw Exceptions::ValueError("Integer underflow [" + name + "]: " + toString());
-        else if (static_cast<R>(value) != value)
-            throw Exceptions::ValueError("Number is not integer [" + name + "]: " + toString());
-        else
-            return static_cast<R>(value);
+        /* signed or unsigned integers */
+        return getIntegers<
+            std::is_signed<T>::value,
+            std::is_unsigned<T>::value,
+            T
+        >();
     }
 
 public:
@@ -418,237 +483,23 @@ public:
 
 /** value getter specializations **/
 
-/* signed integers */
-template <>
-inline int8_t Variant::get<int8_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return _s8;
-        case Type::TypeCode::Int16  : return rangeCheckI<int8_t>("int8_t", _s16, INT8_MIN, INT8_MAX);
-        case Type::TypeCode::Int32  : return rangeCheckI<int8_t>("int8_t", _s32, INT8_MIN, INT8_MAX);
-        case Type::TypeCode::Int64  : return rangeCheckI<int8_t>("int8_t", _s64, INT8_MIN, INT8_MAX);
-
-        case Type::TypeCode::UInt8  : return rangeCheckI<int8_t>("int8_t", _u8 , INT8_MIN, INT8_MAX);
-        case Type::TypeCode::UInt16 : return rangeCheckI<int8_t>("int8_t", _u16, INT8_MIN, INT8_MAX);
-        case Type::TypeCode::UInt32 : return rangeCheckI<int8_t>("int8_t", _u32, INT8_MIN, INT8_MAX);
-        case Type::TypeCode::UInt64 : return rangeCheckI<int8_t>("int8_t", _u64, INT8_MIN, INT8_MAX);
-
-        case Type::TypeCode::Float  : return rangeCheckFI<int8_t>("int8_t", _float , INT8_MIN, INT8_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<int8_t>("int8_t", _double, INT8_MIN, INT8_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to int8_t");
-    }
-}
-
-template <>
-inline int16_t Variant::get<int16_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return _s8;
-        case Type::TypeCode::Int16  : return _s16;
-        case Type::TypeCode::Int32  : return rangeCheckI<int16_t>("int16_t", _s32, INT16_MIN, INT16_MAX);
-        case Type::TypeCode::Int64  : return rangeCheckI<int16_t>("int16_t", _s64, INT16_MIN, INT16_MAX);
-
-        case Type::TypeCode::UInt8  : return rangeCheckI<int16_t>("int16_t", _u8 , INT16_MIN, INT16_MAX);
-        case Type::TypeCode::UInt16 : return rangeCheckI<int16_t>("int16_t", _u16, INT16_MIN, INT16_MAX);
-        case Type::TypeCode::UInt32 : return rangeCheckI<int16_t>("int16_t", _u32, INT16_MIN, INT16_MAX);
-        case Type::TypeCode::UInt64 : return rangeCheckI<int16_t>("int16_t", _u64, INT16_MIN, INT16_MAX);
-
-        case Type::TypeCode::Float  : return rangeCheckFI<int16_t>("int16_t", _float , INT16_MIN, INT16_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<int16_t>("int16_t", _double, INT16_MIN, INT16_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to int16_t");
-    }
-}
-
-template <>
-inline int32_t Variant::get<int32_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return _s8;
-        case Type::TypeCode::Int16  : return _s16;
-        case Type::TypeCode::Int32  : return _s32;
-        case Type::TypeCode::Int64  : return rangeCheckI<int32_t>("int32_t", _s64, INT32_MIN, INT32_MAX);
-
-        case Type::TypeCode::UInt8  : return rangeCheckI<int32_t>("int32_t", _u8 , INT32_MIN, INT32_MAX);
-        case Type::TypeCode::UInt16 : return rangeCheckI<int32_t>("int32_t", _u16, INT32_MIN, INT32_MAX);
-        case Type::TypeCode::UInt32 : return rangeCheckI<int32_t>("int32_t", _u32, INT32_MIN, INT32_MAX);
-        case Type::TypeCode::UInt64 : return rangeCheckI<int32_t>("int32_t", _u64, INT32_MIN, INT32_MAX);
-
-        case Type::TypeCode::Float  : return rangeCheckFI<int32_t>("int32_t", _float , INT32_MIN, INT32_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<int32_t>("int32_t", _double, INT32_MIN, INT32_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to int32_t");
-    }
-}
-
-template <>
-inline int64_t Variant::get<int64_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return _s8;
-        case Type::TypeCode::Int16  : return _s16;
-        case Type::TypeCode::Int32  : return _s32;
-        case Type::TypeCode::Int64  : return _s64;
-
-        case Type::TypeCode::UInt8  : return rangeCheckI<int64_t>("int64_t", _u8 , INT64_MIN, INT64_MAX);
-        case Type::TypeCode::UInt16 : return rangeCheckI<int64_t>("int64_t", _u16, INT64_MIN, INT64_MAX);
-        case Type::TypeCode::UInt32 : return rangeCheckI<int64_t>("int64_t", _u32, INT64_MIN, INT64_MAX);
-        case Type::TypeCode::UInt64 : return rangeCheckI<int64_t>("int64_t", _u64, INT64_MIN, INT64_MAX);
-
-        case Type::TypeCode::Float  : return rangeCheckFI<int64_t>("int64_t", _float , INT64_MIN, INT64_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<int64_t>("int64_t", _double, INT64_MIN, INT64_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to int64_t");
-    }
-}
-
-/* unsigned integers */
-template <>
-inline uint8_t Variant::get<uint8_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return rangeCheckI<uint8_t>("uint8_t", _s8 , 0, UINT8_MAX);
-        case Type::TypeCode::Int16  : return rangeCheckI<uint8_t>("uint8_t", _s16, 0, UINT8_MAX);
-        case Type::TypeCode::Int32  : return rangeCheckI<uint8_t>("uint8_t", _s32, 0, UINT8_MAX);
-        case Type::TypeCode::Int64  : return rangeCheckI<uint8_t>("uint8_t", _s64, 0, UINT8_MAX);
-
-        case Type::TypeCode::UInt8  : return _u8;
-        case Type::TypeCode::UInt16 : return rangeCheckI<uint8_t>("uint8_t", _u16, 0, UINT8_MAX);
-        case Type::TypeCode::UInt32 : return rangeCheckI<uint8_t>("uint8_t", _u32, 0, UINT8_MAX);
-        case Type::TypeCode::UInt64 : return rangeCheckI<uint8_t>("uint8_t", _u64, 0, UINT8_MAX);
-
-        case Type::TypeCode::Float  : return rangeCheckFI<uint8_t>("uint8_t", _float , 0, UINT8_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<uint8_t>("uint8_t", _double, 0, UINT8_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to uint8_t");
-    }
-}
-
-template <>
-inline uint16_t Variant::get<uint16_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return rangeCheckI<uint16_t>("uint16_t", _s8 , 0, UINT16_MAX);
-        case Type::TypeCode::Int16  : return rangeCheckI<uint16_t>("uint16_t", _s16, 0, UINT16_MAX);
-        case Type::TypeCode::Int32  : return rangeCheckI<uint16_t>("uint16_t", _s32, 0, UINT16_MAX);
-        case Type::TypeCode::Int64  : return rangeCheckI<uint16_t>("uint16_t", _s64, 0, UINT16_MAX);
-
-        case Type::TypeCode::UInt8  : return _u8;
-        case Type::TypeCode::UInt16 : return _u16;
-        case Type::TypeCode::UInt32 : return rangeCheckI<uint16_t>("uint16_t", _u32, 0, UINT16_MAX);
-        case Type::TypeCode::UInt64 : return rangeCheckI<uint16_t>("uint16_t", _u64, 0, UINT16_MAX);
-
-        case Type::TypeCode::Float  : return rangeCheckFI<uint16_t>("uint16_t", _float , 0, UINT16_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<uint16_t>("uint16_t", _double, 0, UINT16_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to uint16_t");
-    }
-}
-
-template <>
-inline uint32_t Variant::get<uint32_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return rangeCheckI<uint32_t>("uint32_t", _s8 , 0, UINT32_MAX);
-        case Type::TypeCode::Int16  : return rangeCheckI<uint32_t>("uint32_t", _s16, 0, UINT32_MAX);
-        case Type::TypeCode::Int32  : return rangeCheckI<uint32_t>("uint32_t", _s32, 0, UINT32_MAX);
-        case Type::TypeCode::Int64  : return rangeCheckI<uint32_t>("uint32_t", _s64, 0, UINT32_MAX);
-
-        case Type::TypeCode::UInt8  : return _u8;
-        case Type::TypeCode::UInt16 : return _u16;
-        case Type::TypeCode::UInt32 : return _u32;
-        case Type::TypeCode::UInt64 : return rangeCheckI<uint32_t>("uint32_t", _u64, 0, UINT32_MAX);
-
-        case Type::TypeCode::Float  : return rangeCheckFI<uint32_t>("uint32_t", _float , 0, UINT32_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<uint32_t>("uint32_t", _double, 0, UINT32_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to uint32_t");
-    }
-}
-
-template <>
-inline uint64_t Variant::get<uint64_t>(void) const
-{
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return rangeCheckI<uint64_t>("uint64_t", _s8 , 0, UINT64_MAX);
-        case Type::TypeCode::Int16  : return rangeCheckI<uint64_t>("uint64_t", _s16, 0, UINT64_MAX);
-        case Type::TypeCode::Int32  : return rangeCheckI<uint64_t>("uint64_t", _s32, 0, UINT64_MAX);
-        case Type::TypeCode::Int64  : return rangeCheckI<uint64_t>("uint64_t", _s64, 0, UINT64_MAX);
-
-        case Type::TypeCode::UInt8  : return _u8;
-        case Type::TypeCode::UInt16 : return _u16;
-        case Type::TypeCode::UInt32 : return _u32;
-        case Type::TypeCode::UInt64 : return _u64;
-
-        case Type::TypeCode::Float  : return rangeCheckFI<uint64_t>("uint64_t", _float , 0, UINT64_MAX);
-        case Type::TypeCode::Double : return rangeCheckFI<uint64_t>("uint64_t", _double, 0, UINT64_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to uint64_t");
-    }
-}
-
 /* floating point numbers */
 template <>
 inline float Variant::get<float>(void) const
 {
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return _s8;
-        case Type::TypeCode::Int16  : return _s16;
-        case Type::TypeCode::Int32  : return _s32;
-        case Type::TypeCode::Int64  : return _s64;
-
-        case Type::TypeCode::UInt8  : return _u8;
-        case Type::TypeCode::UInt16 : return _u16;
-        case Type::TypeCode::UInt32 : return _u32;
-        case Type::TypeCode::UInt64 : return _u64;
-
-        case Type::TypeCode::Float  : return _float;
-        case Type::TypeCode::Double : return rangeCheckF<float>("float", _double, FLT_MIN, FLT_MAX);
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to float");
-    }
+    if (_type == Type::TypeCode::Float)
+        return _float;
+    else
+        throw Exceptions::TypeError(toString() + " is not a float");
 }
 
 template <>
 inline double Variant::get<double>(void) const
 {
-    switch (_type)
-    {
-        case Type::TypeCode::Int8   : return _s8;
-        case Type::TypeCode::Int16  : return _s16;
-        case Type::TypeCode::Int32  : return _s32;
-        case Type::TypeCode::Int64  : return _s64;
-
-        case Type::TypeCode::UInt8  : return _u8;
-        case Type::TypeCode::UInt16 : return _u16;
-        case Type::TypeCode::UInt32 : return _u32;
-        case Type::TypeCode::UInt64 : return _u64;
-
-        case Type::TypeCode::Float  : return _float;
-        case Type::TypeCode::Double : return _double;
-
-        default:
-            throw Exceptions::TypeError(toString() + " is not convertiable to double");
-    }
+    if (_type == Type::TypeCode::Double)
+        return _double;
+    else
+        throw Exceptions::TypeError(toString() + " is not a double");
 }
 
 /* STL string, reference version */
@@ -658,7 +509,7 @@ inline const std::string &Variant::get<const std::string &>(void) const
     if (_type == Type::TypeCode::String)
         return _string;
     else
-        throw Exceptions::TypeError(toString() + " is not convertiable to string");
+        throw Exceptions::TypeError(toString() + " is not a string");
 }
 
 /* compond types */
@@ -668,7 +519,7 @@ inline const Variant::Array  &Variant::get<const Variant::Array  &>(void) const
     if (_type == Type::TypeCode::Array)
         return _array;
     else
-        throw Exceptions::TypeError(toString() + " is not convertiable to array");
+        throw Exceptions::TypeError(toString() + " is not an array");
 }
 
 template <>
@@ -677,7 +528,7 @@ inline const Variant::Object &Variant::get<const Variant::Object &>(void) const
     if (_type == Type::TypeCode::Struct)
         return _object;
     else
-        throw Exceptions::TypeError(toString() + " is not convertiable to object");
+        throw Exceptions::TypeError(toString() + " is not an object");
 }
 
 /* STL string, value version */
