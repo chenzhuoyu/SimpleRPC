@@ -58,6 +58,13 @@ public:
 
 };
 
+class ReflectionError : public Exception
+{
+public:
+    explicit ReflectionError(const std::string &message) : Exception(message) {}
+
+};
+
 class ClassNotFoundError : public Exception
 {
 public:

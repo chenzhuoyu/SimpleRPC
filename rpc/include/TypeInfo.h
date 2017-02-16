@@ -100,26 +100,26 @@ public:
     }
 
 public:
-    std::string toString(void) const
+    std::string toSignature(void) const
     {
         switch (_typeCode)
         {
-            case TypeCode::Int8     : return "int8_t";
-            case TypeCode::Int16    : return "int16_t";
-            case TypeCode::Int32    : return "int32_t";
-            case TypeCode::Int64    : return "int64_t";
+            case TypeCode::Int8     : return "b";
+            case TypeCode::Int16    : return "h";
+            case TypeCode::Int32    : return "i";
+            case TypeCode::Int64    : return "q";
 
-            case TypeCode::UInt8    : return "uint8_t";
-            case TypeCode::UInt16   : return "uint16_t";
-            case TypeCode::UInt32   : return "uint32_t";
-            case TypeCode::UInt64   : return "uint64_t";
+            case TypeCode::UInt8    : return "B";
+            case TypeCode::UInt16   : return "H";
+            case TypeCode::UInt32   : return "I";
+            case TypeCode::UInt64   : return "Q";
 
-            case TypeCode::Float    : return "float";
-            case TypeCode::Double   : return "double";
+            case TypeCode::Float    : return "f";
+            case TypeCode::Double   : return "d";
 
-            case TypeCode::Struct   : return _className;
-            case TypeCode::String   : return "std::string";
-            case TypeCode::Array    : return "std::vector<" + _itemType->toString() + ">";
+            case TypeCode::String   : return "s";
+            case TypeCode::Struct   : return "{" + _className + "}";
+            case TypeCode::Array    : return "[" + _itemType->toSignature() + "]";
 
             default:
             {
@@ -137,48 +137,70 @@ class Serializable;
 
 /* type size container */
 template <size_t size>
-struct TypeSize
+struct TypeSize;
+
+template <>
+struct TypeSize<sizeof(int8_t)>
 {
-    static Type signedType(void)
-    {
-        /* these `if` statement would be optimized away by compiler */
-        if (size == sizeof(int8_t )) return Type::TypeCode::Int8;
-        if (size == sizeof(int16_t)) return Type::TypeCode::Int16;
-        if (size == sizeof(int32_t)) return Type::TypeCode::Int32;
-        if (size == sizeof(int64_t)) return Type::TypeCode::Int64;
+    static Type   signedType(void) { return Type::TypeCode:: Int8; }
+    static Type unsignedType(void) { return Type::TypeCode::UInt8; }
+};
 
-        /* should never reaches here */
-        static_assert(size == sizeof(int8_t) || size == sizeof(int16_t) || size == sizeof(int32_t) || size == sizeof(int64_t), "Unknown signed integer size");
-        abort();
-    }
+template <>
+struct TypeSize<sizeof(int16_t)>
+{
+    static Type   signedType(void) { return Type::TypeCode:: Int16; }
+    static Type unsignedType(void) { return Type::TypeCode::UInt16; }
+};
 
-    static Type unsignedType(void)
-    {
-        /* these `if` statement would be optimized away by compiler */
-        if (size == sizeof(uint8_t )) return Type::TypeCode::UInt8;
-        if (size == sizeof(uint16_t)) return Type::TypeCode::UInt16;
-        if (size == sizeof(uint32_t)) return Type::TypeCode::UInt32;
-        if (size == sizeof(uint64_t)) return Type::TypeCode::UInt64;
+template <>
+struct TypeSize<sizeof(int32_t)>
+{
+    static Type   signedType(void) { return Type::TypeCode:: Int32; }
+    static Type unsignedType(void) { return Type::TypeCode::UInt32; }
+};
 
-        /* should never reaches here */
-        static_assert(size == sizeof(uint8_t) || size == sizeof(uint16_t) || size == sizeof(uint32_t) || size == sizeof(uint64_t), "Unknown unsigned integer size");
-        abort();
-    }
+template <>
+struct TypeSize<sizeof(int64_t)>
+{
+    static Type   signedType(void) { return Type::TypeCode:: Int64; }
+    static Type unsignedType(void) { return Type::TypeCode::UInt64; }
 };
 
 template <bool isSigned, bool isUnsigned, bool isStructLike, typename Item>
 struct TypeHelper
 {
+    /* types that not recognized */
+    static_assert(isSigned || isUnsigned || isStructLike, "Cannot serialize or deserialize arbitrary type");
+};
+
+template <typename Item>
+struct TypeHelper<true, false, false, Item>
+{
     static Type type(void)
     {
-        /* these `if` statement would be optimized away by compiler */
-        if (isSigned)       return TypeSize<sizeof(Item)>::signedType();
-        if (isUnsigned)     return TypeSize<sizeof(Item)>::unsignedType();
-        if (isStructLike)   return Type(Type::TypeCode::Struct, typeid(Item).name());
+        /* signed integers */
+        return TypeSize<sizeof(Item)>::signedType();
+    }
+};
 
-        /* should never reaches here */
-        static_assert(isSigned || isUnsigned || isStructLike, "Cannot serialize or deserialize arbitrary type");
-        abort();
+template <typename Item>
+struct TypeHelper<false, true, false, Item>
+{
+    static Type type(void)
+    {
+        /* unsigned integers */
+        return TypeSize<sizeof(Item)>::unsignedType();
+    }
+};
+
+template <typename Item>
+struct TypeHelper<false, false, true, Item>
+{
+    static Type type(void)
+    {
+        /* structure types */
+        return Type(Type::TypeCode::Struct, typeid(Item).name());
     }
 };
 
@@ -215,6 +237,13 @@ template <> struct TypeItem<double> { static Type type(void) { return Type::Type
 /* STL string */
 template <> struct TypeItem<std::string> { static Type type(void) { return Type::TypeCode::String; } };
 
+/* constant references */
+template <typename T>
+struct TypeItem<const T &> : public TypeItem<T>
+{
+    /* this is just for removing reference */
+};
+
 /****** Type array resolvers ******/
 
 template <typename ... Items>
@@ -241,6 +270,53 @@ struct TypeArray<>
         /* final recursion, no arguments left */
         return std::vector<Type>();
     }
+};
+
+/****** Signature generators ******/
+
+template <typename T>
+struct Signature
+{
+    static std::string resolve(void)
+    {
+        /* simple type, just resolve by `Type` */
+        return TypeItem<T>::type().toSignature();
+    }
+};
+
+template <typename T>
+struct Signature<std::vector<T>>
+{
+    static std::string resolve(void)
+    {
+        /* arrays, resolve recursively  */
+        return "[" + Signature<T>::resolve() + "]";
+    }
+};
+
+template <typename R, typename T, typename ... Args>
+struct Signature<R (T::*)(Args ...)>
+{
+    static std::string resolve(void)
+    {
+        /* method signature should be treated seperately */
+        std::string result = "(";
+        std::vector<Type> &&types = TypeArray<Args ...>::type();
+
+        std::for_each(types.begin(), types.end(), [&](auto x){ result += x.toSignature(); });
+        return result + ")" + TypeItem<R>::type().toSignature();
+    }
+};
+
+/****** Utilities ******/
+
+template <typename T>
+struct IsVector : public std::false_type {};
+
+template <typename T>
+struct IsVector<std::vector<T>> : public std::true_type
+{
+    typedef T ItemType;
 };
 }
 }

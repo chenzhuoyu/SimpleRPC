@@ -8,34 +8,19 @@
 
 namespace SimpleRPC
 {
-typedef Internal::Field     Field;
-typedef Internal::Method    Method;
-typedef Internal::Variant   Variant;
-typedef Internal::Registry  Registry;
-
-struct Serializable
-{
-    typedef Internal::Registry::Meta Meta;
-
-protected:
-    const Meta *_meta;
-
-protected:
-    virtual ~Serializable() {}
-    explicit Serializable() {}
-
-public:
-    const Meta &meta(void) const { return *_meta; }
-
-};
+typedef Internal::Field         Field;
+typedef Internal::Method        Method;
+typedef Internal::Variant       Variant;
+typedef Internal::Registry      Registry;
+typedef Internal::Serializable  Serializable;
 
 template <typename T>
-struct SerializableWrapper : public Serializable
+struct SerializableWrapper : public Internal::Serializable
 {
     explicit SerializableWrapper()
     {
         /* load meta-data from registry */
-        _meta = &(Registry::findClass(typeid(T).name()));
+        _meta = &(Registry::findClass(Internal::Signature<T>::resolve()));
     }
 };
 }

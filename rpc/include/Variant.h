@@ -17,6 +17,7 @@
 #include <string.h>
 
 #include "TypeInfo.h"
+#include "Registry.h"
 #include "Exceptions.h"
 #include "Functional.h"
 
@@ -68,7 +69,7 @@ private:
 private:
     Type::TypeCode _type;
 
-public:
+private:
     explicit Variant(const Type::TypeCode &type) : _type(type) {}
 
 public:
@@ -223,52 +224,90 @@ private:
     }
 
 private:
-    template <bool isSigned, bool isUnsigned, typename T>
-    inline T getIntegers(void) const
-    {
-        /* these `if` statement would be optimized away by compiler */
-        if (isSigned)   return getSigned<sizeof(T), T>();
-        if (isUnsigned) return getUnsigned<sizeof(T), T>();
+    template <typename T> inline std::enable_if_t<std::is_signed  <T>::value, void> getValue(T &v) const { v = getSigned  <sizeof(T), T>(); }
+    template <typename T> inline std::enable_if_t<std::is_unsigned<T>::value, void> getValue(T &v) const { v = getUnsigned<sizeof(T), T>(); }
 
-        /* should never reaches here */
-        static_assert(isSigned || isUnsigned, "Cannot convert to arbitrary types");
-        abort();
+private:
+    template <typename T>
+    inline std::enable_if_t<IsVector<T>::value, void> getValue(T &v) const
+    {
+        if (_type != Type::TypeCode::Array)
+            throw Exceptions::TypeError(toString() + " is not an array");
+
+        typedef typename IsVector<T>::ItemType ItemType;
+        std::vector<ItemType> *array = static_cast<std::vector<ItemType> *>(&v);
+
+        for (const auto &item : _array)
+            array->push_back(item->get<ItemType>());
+    }
+
+private:
+    template <typename T>
+    inline std::enable_if_t<std::is_convertible<T *, Serializable *>::value, void> getValue(T &v) const
+    {
+        /* it's ensured to be convertible to `Serializable` as `std:enable_if_t<...>` says */
+        auto object = dynamic_cast<Serializable *>(&v);
+        const auto &fields = object->meta().fields();
+
+        if (_type != Type::TypeCode::Struct)
+            throw Exceptions::TypeError(toString() + " is not an object");
+
+        for (const auto &item : _object)
+        {
+            if (fields.find(item.first) == fields.end())
+                throw Exceptions::ReflectionError("Missing field \"" + item.first + "\"");
+
+            // TODO: convert and set into object
+            fprintf(stderr, "%s -> %s\n", item.first.c_str(), item.second->toString().c_str());
+        }
     }
 
 public:
     template <typename T>
     inline T get(void) const
     {
-        /* signed or unsigned integers */
-        return getIntegers<
-            std::is_signed<T>::value,
-            std::is_unsigned<T>::value,
-            T
-        >();
+        T v;
+        getValue(v);
+        return std::move(v);
+    }
+
+public:
+    size_t size(void) const
+    {
+        if (_type == Type::TypeCode::Array)
+            return _array.size();
+        else
+            throw Exceptions::TypeError(toString() + " is not an array");
     }
 
 public:
     Variant &operator[](ssize_t index)
     {
-        if (index < 0 || index >= _array.size())
-            return *_array[index].get();
-        else
+        if (_type != Type::TypeCode::Array)
+            throw Exceptions::TypeError(toString() + " is not an array");
+        else if (index < 0 || index >= _array.size())
             throw Exceptions::IndexError(index);
+        else
+            return *_array[index].get();
     }
 
 public:
     const Variant &operator[](ssize_t index) const
     {
-        if (index >= 0 && index < _array.size())
-            return *_array[index].get();
-        else
+        if (_type != Type::TypeCode::Array)
+            throw Exceptions::TypeError(toString() + " is not an array");
+        else if (index < 0 || index >= _array.size())
             throw Exceptions::IndexError(index);
+        else
+            return *_array[index].get();
     }
 
 public:
     Variant &operator[](const std::string &key)
     {
-        if (_object.find(key) == _object.end())
+        if (_type != Type::TypeCode::Struct)
+            throw Exceptions::TypeError(toString() + " is not an object");
+        else if (_object.find(key) == _object.end())
             _object.insert({ key, std::make_shared<Variant>(0) });
 
         /* guaranted we have this key */
@@ -278,10 +317,12 @@ public:
 public:
     const Variant &operator[](const std::string &key) const
     {
-        if (_object.find(key) != _object.end())
-            return *_object.at(key);
-        else
+        if (_type != Type::TypeCode::Struct)
+            throw Exceptions::TypeError(toString() + " is not an object");
+        else if (_object.find(key) == _object.end())
             throw Exceptions::NameError(key);
+        else
+            return *_object.at(key);
     }
 
 private:
@@ -292,7 +333,7 @@ private:
     template <typename Arg, typename ... Args>
     struct ArrayBuilder<Arg, Args ...>
     {
-        static std::vector<std::shared_ptr<Variant>> &build(std::vector<std::shared_ptr<Variant>> &array, const Arg &arg, const Args & ... args)
+        static Array &build(Array &array, const Arg &arg, const Args & ... args)
         {
             array.push_back(std::make_shared<Variant>(arg));
             return ArrayBuilder<Args ...>::build(array, args ...);
@@ -303,7 +344,7 @@ private:
     template <typename Arg>
     struct ArrayBuilder<Arg>
     {
-        static std::vector<std::shared_ptr<Variant>> &build(std::vector<std::shared_ptr<Variant>> &array, const Arg &arg)
+        static Array &build(Array &array, const Arg &arg)
         {
             /* last recursion, only one argument left */
             array.push_back(std::make_shared<Variant>(arg));
@@ -317,6 +358,30 @@ public:
     {
         std::vector<std::shared_ptr<Variant>> array;
         return Variant(ArrayBuilder<Args ...>::build(array, args ...));
+    }
+
+public:
+    struct VariantPair
+    {
+        std::string name;
+        std::shared_ptr<Variant> value;
+
+    public:
+        template <typename T>
+        VariantPair(const std::string &name, T &&value) : name(name), value(std::make_shared<Variant>(std::forward<T>(value))) {}
+
+    };
+
+public:
+    static Variant object(std::initializer_list<VariantPair> list)
+    {
+        Variant result(Type::TypeCode::Struct);
+
+        /* fill each key-value pair */
+        for (const auto &pair : list)
+            result._object.insert({ pair.name, pair.value });
+
+        return result;
     }
 
 #define cache_def()             \
@@ -512,9 +577,9 @@ inline const std::string &Variant::get<const std::string &>(void) const
         throw Exceptions::TypeError(toString() + " is not a string");
 }
 
-/* compond types */
+/* internal variant storages */
 template <>
-inline const Variant::Array  &Variant::get<const Variant::Array  &>(void) const
+inline const Variant::Array &Variant::get<const Variant::Array &>(void) const
 {
     if (_type == Type::TypeCode::Array)
         return _array;
@@ -534,7 +599,7 @@ inline const Variant::Object &Variant::get<const Variant::Object &>(void) const
 /* STL string, value version */
 template <> inline std::string Variant::get<std::string>(void) const { return get<const std::string &>(); }
 
-/* compond types, value version */
+/* internal variant storages, value version */
 template <> inline Variant::Array  Variant::get<Variant::Array >(void) const { return get<const Variant::Array  &>(); }
 template <> inline Variant::Object Variant::get<Variant::Object>(void) const { return get<const Variant::Object &>(); }
 }

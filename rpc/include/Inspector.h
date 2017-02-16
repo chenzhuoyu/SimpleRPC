@@ -14,18 +14,15 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <cxxabi.h>
 
 #include "Variant.h"
 #include "TypeInfo.h"
+#include "Registry.h"
 #include "Exceptions.h"
 #include "Functional.h"
 
 namespace SimpleRPC
 {
-/* forward declaration of class `Serializable` must be put here, it is not belonging to `Internal` namespace */
-class Serializable;
-
 namespace Internal
 {
 /****** Field meta-data ******/
@@ -68,15 +65,15 @@ private:
     Method &operator=(const Method &) = delete;
 
 public:
-    typedef std::function<Variant(::SimpleRPC::Serializable *, const Variant &)> Proxy;
+    typedef std::function<Variant(Serializable *, const Variant &)> Proxy;
 
 private:
     Proxy _proxy;
     std::vector<Type> _args;
 
 public:
-    explicit Method(const char *name, const char *signature, Type &&result, std::vector<Type> &&args, Proxy &&proxy) :
-        _name(name + std::string("::") + signature), _args(std::move(args)), _result(std::move(result)), _proxy(std::move(proxy)) {}
+    explicit Method(const char *name, Type &&result, std::vector<Type> &&args, std::string &&signature, Proxy &&proxy) :
+        _args(std::move(args)), _name(name + signature), _proxy(std::move(proxy)), _result(std::move(result)) {}
 
 public:
     const Type &result(void) const { return _result; }
@@ -84,80 +81,7 @@ public:
     const std::vector<Type> &args(void) const { return _args; }
 
 public:
-    Variant invoke(::SimpleRPC::Serializable *self, const Variant &args) const { return _proxy(self, args); }
-
-};
-
-/****** Reflection registry ******/
-
-struct Registry
-{
-    class Meta
-    {
-        Meta(const Meta &) = delete;
-        Meta &operator=(const Meta &) = delete;
-
-    public:
-        typedef std::unordered_map<std::string, std::shared_ptr<Field>> FieldMap;
-        typedef std::unordered_map<std::string, std::shared_ptr<Method>> MethodMap;
-
-    public:
-        typedef ::SimpleRPC::Serializable *(* Constructor)(void);
-
-    private:
-        FieldMap _fields;
-        MethodMap _methods;
-        Constructor _constructor;
-
-    private:
-        std::string _name;
-
-    public:
-        explicit Meta() : _constructor(nullptr) {}
-        explicit Meta(const char *name, FieldMap &&fields, MethodMap &&methods, Constructor &&constructor) :
-            _name(name), _fields(std::move(fields)), _methods(std::move(methods)), _constructor(std::move(constructor)) {}
-
-    public:
-        Meta(Meta &&other)
-        {
-            std::swap(_fields, other._fields);
-            std::swap(_methods, other._methods);
-            std::swap(_constructor, other._constructor);
-        }
-
-    public:
-        const std::string &name(void) const { return _name; }
-
-    public:
-        const FieldMap &fields(void) const { return _fields; }
-        const MethodMap &methods(void) const { return _methods; }
-
-    public:
-        template <typename T> T *newInstance(void) const { return static_cast<T *>(_constructor()); }
-
-    public:
-        std::string readableName(void) const
-        {
-            int status;
-            char *demangled = abi::__cxa_demangle(_name.c_str(), nullptr, nullptr, &status);
-            std::string result = demangled ? std::string(demangled) : _name;
-
-            free(demangled);
-            return result;
-        }
-    };
-
-private:
-    Registry() = delete;
-   ~Registry() = delete;
-
-private:
-    Registry(const Registry &) = delete;
-    Registry &operator=(const Registry &) = delete;
-
-public:
-    static void addClass(const std::string &name, std::shared_ptr<Meta> &&meta);
-    static const Meta &findClass(const std::string &name);
+    Variant invoke(Serializable *self, const Variant &args) const { return _proxy(self, args); }
 
 };
 
@@ -172,7 +96,7 @@ struct ParamTuple<Item, Items ...>
     static std::tuple<Item, Items ...> expand(const Variant &array, int pos = 0)
     {
         return std::tuple_cat(
-            std::make_tuple<Item>(array[pos].get<Item>()),
+            std::make_tuple(array[pos].get<Item>()),
             ParamTuple<Items ...>::expand(array, pos + 1)
         );
     }
@@ -193,7 +117,7 @@ struct ParamTuple<>
 template <typename T>
 struct Descriptor
 {
-    static_assert(std::is_convertible<T *, ::SimpleRPC::Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
+    static_assert(std::is_convertible<T *, Serializable *>::value, "Cannot serialize or deserialize arbitrary type");
 
 public:
     struct MemberData
@@ -212,10 +136,10 @@ public:
         explicit MemberData(const char *name, Result (T::*&&method)(Args ...)) :
             isMethod(true), method(new Method(
                 name,
-                typeid(method).name(),
                 TypeItem<Result>::type(),
                 TypeArray<Args ...>::type(),
-                [=](::SimpleRPC::Serializable *self, const Variant &argv)
+                Signature<Result (T::*)(Args ...)>::resolve(),
+                [=](Serializable *self, const Variant &argv)
                 {
                     /* check for valid parameter pack type */
                     if (argv.type() != Type::TypeCode::Array)
@@ -245,15 +169,12 @@ public:
                 methods.insert({ info.method->name(), std::move(info.method) });
         }
 
-        Registry::addClass(
-            typeid(T).name(),
-            std::make_shared<Registry::Meta>(
-                typeid(T).name(),
-                std::move(fields),
-                std::move(methods),
-                []{ return static_cast<::SimpleRPC::Serializable *>(new T); }
-            )
-        );
+        Registry::addClass(std::make_shared<Registry::Meta>(
+            Signature<T>::resolve(),
+            std::move(fields),
+            std::move(methods),
+            []{ return static_cast<Serializable *>(new T); }
+        ));
     }
 };
 }
