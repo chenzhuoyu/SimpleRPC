@@ -4,6 +4,8 @@
 #define SIMPLERPC_SERIALIZABLE_H
 
 #include <boost/preprocessor.hpp>
+
+#include "Registry.h"
 #include "Inspector.h"
 
 namespace SimpleRPC
