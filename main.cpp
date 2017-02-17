@@ -2,7 +2,8 @@
 #include "Serializable.h"
 
 defineClass(Foo,
-    defineField(std::vector<std::string>, x)
+    defineField(std::vector<std::string>, x),
+    defineLiteral(Foo(const std::vector<std::string> &v) : x(v) {})
 )
 
 defineClass(Test,
@@ -22,12 +23,8 @@ int Test::test(long x, std::string y)
         for (const auto &q : p.x)
             fprintf(stderr, "c[].x: %s\n", q.c_str());
     fprintf(stderr, "=====\n");
-    Foo foo1;
-    foo1.x.push_back("response");
-    foo1.x.push_back("text");
-    Foo foo2;
-    foo2.x.push_back("from");
-    foo2.x.push_back("test");
+    Foo foo1({ "response", "text" });
+    Foo foo2({ "from", "test" });
     c.push_back(foo1);
     c.push_back(foo2);
     return 456123;
