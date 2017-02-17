@@ -92,6 +92,7 @@ public:
 
 /****** Serializable object container ******/
 
+class Variant;
 struct Serializable
 {
     typedef Registry::Meta Meta;
@@ -106,8 +107,14 @@ protected:
 public:
     const Meta &meta(void) const { return *_meta; }
 
+public:
+    Variant serialize(void) const;
+
+public:
+    void deserialize(const Variant &value);
+
 };
 }
 }
 
-#endif //SIMPLERPC_REGISTRY_H
+#endif /* SIMPLERPC_REGISTRY_H */

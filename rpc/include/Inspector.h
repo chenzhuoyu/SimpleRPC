@@ -38,7 +38,16 @@ private:
     Field &operator=(const Field &) = delete;
 
 public:
-    explicit Field(const std::string &name, const Type &type, size_t offset) : _type(type), _name(name), _offset(offset) {}
+    typedef std::function<Variant(const Field *, const void *)> Serializer;
+    typedef std::function<void(const Field *, void *, const Variant &)> Deserializer;
+
+private:
+    Serializer _serializer;
+    Deserializer _deserializer;
+
+public:
+    explicit Field(const std::string &name, const Type &type, size_t offset, Serializer &&serializer, Deserializer &&deserializer) :
+        _type(type), _name(name), _offset(offset), _serializer(serializer), _deserializer(deserializer) {}
 
 public:
     size_t offset(void) const { return _offset; }
@@ -48,8 +57,18 @@ public:
     const std::string &name(void) const { return _name; }
 
 public:
+    Variant serialize(const void *self) const { return _serializer(this, self); }
+
+public:
+    void deserialize(void *self, const Variant &value) { _deserializer(this, self, value); }
+
+public:
     template <typename T>
     T &data(void *self) const { return *reinterpret_cast<T *>(reinterpret_cast<uintptr_t>(self) + _offset); }
+
+public:
+    template <typename T>
+    const T &data(const void *self) const { return *reinterpret_cast<const T *>(reinterpret_cast<uintptr_t>(self) + _offset); }
 
 };
 
@@ -128,8 +147,22 @@ public:
 
     public:
         template <typename FieldType>
-        explicit MemberData(const std::string &name, const FieldType &field) :
-            isMethod(false), field(new Field(name, TypeItem<FieldType>::type(), reinterpret_cast<uintptr_t>(&field))) {}
+        explicit MemberData(const std::string &name, const FieldType &reference) :
+            isMethod(false), field(new Field(
+                name,
+                TypeItem<FieldType>::type(),
+                reinterpret_cast<uintptr_t>(&reference),
+                [=](const Field *field, const void *self)
+                {
+                    /* using the template to resolve types during compilation */
+                    return Variant(field->data<FieldType>(self));
+                },
+                [=](const Field *field, void *self, const Variant &value)
+                {
+                    /* using the template to resolve types during compilation */
+                    field->data<FieldType>(self) = value.get<FieldType>();
+                }
+            )) {}
 
     public:
         template <typename Result, typename ... Args>
@@ -141,16 +174,11 @@ public:
                 Signature<Result (T::*)(Args ...)>::resolve(),
                 [=](Serializable *self, const Variant &argv)
                 {
-                    /* check for valid parameter pack type */
-                    if (argv.type() != Type::TypeCode::Array)
-                        throw Exceptions::TypeError("Invoke parameter pack must be array");
-
-                    /* check for parameter count */
-                    if (argv.get<const Variant::Array &>().size() != sizeof ... (Args))
-                        throw Exceptions::ArgumentError(sizeof ... (Args), argv.get<const Variant::Array &>().size());
-
-                    /* invoke target method with parameter array */
-                    return Variant(Functional::apply(static_cast<T *>(self), method, ParamTuple<Args ...>::expand(argv)));
+                    /* check for parameter count and invoke target method with parameter array */
+                    if (argv.size() != sizeof ... (Args))
+                        throw Exceptions::ArgumentError(sizeof ... (Args), argv.size());
+                    else
+                        return Variant(Functional::apply(static_cast<T *>(self), method, ParamTuple<Args ...>::expand(argv)));
                 }
             )) {}
     };

@@ -69,7 +69,7 @@ private:
 private:
     Type::TypeCode _type;
 
-private:
+public:
     explicit Variant(const Type::TypeCode &type) : _type(type) {}
 
 public:
@@ -93,8 +93,16 @@ public:
     Variant(const std::string &value) : _type(Type::TypeCode::String), _string(value) {}
 
 public:
-    Variant(const Array  &value) : _type(Type::TypeCode::Array ), _array (value) {}
-    Variant(const Object &value) : _type(Type::TypeCode::Struct), _object(value) {}
+    template <typename T>
+    Variant(const std::vector<T> &value) : _type(Type::TypeCode::Array)
+    {
+        for (const auto &item : value)
+            _array.push_back(std::make_shared<Variant>(item));
+    }
+
+public:
+    template <typename T, typename = std::enable_if_t<std::is_convertible<T *, Serializable *>::value, void>>
+    Variant(const T &value) : _type(Type::TypeCode::Struct) { assign(value.serialize()); }
 
 public:
     Variant(Variant &&other)      { swap(std::move(other)); }
@@ -246,20 +254,10 @@ private:
     inline std::enable_if_t<std::is_convertible<T *, Serializable *>::value, void> getValue(T &v) const
     {
         /* it's ensured to be convertible to `Serializable` as `std:enable_if_t<...>` says */
-        auto object = dynamic_cast<Serializable *>(&v);
-        const auto &fields = object->meta().fields();
-
-        if (_type != Type::TypeCode::Struct)
+        if (_type == Type::TypeCode::Struct)
+            v.deserialize(*this);
+        else
             throw Exceptions::TypeError(toString() + " is not an object");
-
-        for (const auto &item : _object)
-        {
-            if (fields.find(item.first) == fields.end())
-                throw Exceptions::ReflectionError("Missing field \"" + item.first + "\"");
-
-            // TODO: convert and set into object
-            fprintf(stderr, "%s -> %s\n", item.first.c_str(), item.second->toString().c_str());
-        }
     }
 
 public:
@@ -278,6 +276,17 @@ public:
             return _array.size();
         else
             throw Exceptions::TypeError(toString() + " is not an array");
+    }
+
+public:
+    std::vector<std::string> keys(void) const
+    {
+        if (_type != Type::TypeCode::Struct)
+            throw Exceptions::TypeError(toString() + " is not an object");
+
+        std::vector<std::string> result(_object.size());
+        std::transform(_object.begin(), _object.end(), result.begin(), [](auto x){ return x.first; });
+        return result;
     }
 
 public:
@@ -333,10 +342,10 @@ private:
     template <typename Arg, typename ... Args>
     struct ArrayBuilder<Arg, Args ...>
     {
-        static Array &build(Array &array, const Arg &arg, const Args & ... args)
+        static void build(Array &array, const Arg &arg, const Args & ... args)
         {
             array.push_back(std::make_shared<Variant>(arg));
-            return ArrayBuilder<Args ...>::build(array, args ...);
+            ArrayBuilder<Args ...>::build(array, args ...);
         }
     };
 
@@ -344,11 +353,10 @@ private:
     template <typename Arg>
     struct ArrayBuilder<Arg>
     {
-        static Array &build(Array &array, const Arg &arg)
+        static void build(Array &array, const Arg &arg)
         {
             /* last recursion, only one argument left */
             array.push_back(std::make_shared<Variant>(arg));
-            return array;
         }
     };
 
@@ -356,8 +364,12 @@ public:
     template <typename ... Args>
     static Variant array(const Args & ... args)
     {
+        Variant result(Type::TypeCode::Array);
         std::vector<std::shared_ptr<Variant>> array;
-        return Variant(ArrayBuilder<Args ...>::build(array, args ...));
+        ArrayBuilder<Args ...>::build(array, args ...);
+
+        result._array = std::move(array);
+        return result;
     }
 
 public:
@@ -375,6 +387,7 @@ public:
 public:
     static Variant object(std::initializer_list<VariantPair> list)
     {
+        /* create object type */
         Variant result(Type::TypeCode::Struct);
 
         /* fill each key-value pair */
@@ -518,9 +531,13 @@ public:
                 std::vector<std::string> items;
 
                 for (const auto &item : _array)
+                {
                     items.push_back(item->toString());
+                    items.push_back(", ");
+                }
 
-                std::copy(items.begin(), items.end(), std::ostream_iterator<std::string>(oss, ", "));
+                items.pop_back();
+                std::copy(items.begin(), items.end(), std::ostream_iterator<std::string>(oss));
                 return "[" + oss.str() + "]";
             }
 
@@ -531,9 +548,13 @@ public:
                 std::vector<std::string> items;
 
                 for (const auto &item : _object)
+                {
                     items.push_back(Variant::escapeString(item.first) + ": " + item.second->toString());
+                    items.push_back(", ");
+                }
 
-                std::copy(items.begin(), items.end(), std::ostream_iterator<std::string>(oss, ", "));
+                items.pop_back();
+                std::copy(items.begin(), items.end(), std::ostream_iterator<std::string>(oss));
                 return "{" + oss.str() + "}";
             }
 
@@ -577,31 +598,8 @@ inline const std::string &Variant::get<const std::string &>(void) const
         throw Exceptions::TypeError(toString() + " is not a string");
 }
 
-/* internal variant storages */
-template <>
-inline const Variant::Array &Variant::get<const Variant::Array &>(void) const
-{
-    if (_type == Type::TypeCode::Array)
-        return _array;
-    else
-        throw Exceptions::TypeError(toString() + " is not an array");
-}
-
-template <>
-inline const Variant::Object &Variant::get<const Variant::Object &>(void) const
-{
-    if (_type == Type::TypeCode::Struct)
-        return _object;
-    else
-        throw Exceptions::TypeError(toString() + " is not an object");
-}
-
 /* STL string, value version */
 template <> inline std::string Variant::get<std::string>(void) const { return get<const std::string &>(); }
-
-/* internal variant storages, value version */
-template <> inline Variant::Array  Variant::get<Variant::Array >(void) const { return get<const Variant::Array  &>(); }
-template <> inline Variant::Object Variant::get<Variant::Object>(void) const { return get<const Variant::Object &>(); }
 }
 }
 
