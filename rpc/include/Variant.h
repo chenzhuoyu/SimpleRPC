@@ -334,16 +334,13 @@ public:
             return *_object.at(key);
     }
 
-/** BEGIN :: these methods will be used by serialization / deserialization backend, see `backend/Backend.h` **/
+/** BEGIN :: these methods should only be used by serialization / deserialization backends unless you know what you are doing **/
 
-private:
-    friend class Backend;
-
-protected:
+public:
     Array &internalArray(void) { return _array; }
     Object &internalObject(void) { return _object; }
 
-protected:
+public:
     const Array &internalArray(void) const { return _array; }
     const Object &internalObject(void) const { return _object; }
 
