@@ -7,9 +7,6 @@
 #include <typeinfo>
 #include <stdexcept>
 
-#include <cxxabi.h>
-#include <stdlib.h>
-
 namespace SimpleRPC
 {
 namespace Exceptions
@@ -50,6 +47,13 @@ public:
 
 };
 
+class RuntimeError : public Exception
+{
+public:
+    explicit RuntimeError(const std::string &message) : Exception(message) {}
+
+};
+
 class ArgumentError : public Exception
 {
 public:
@@ -79,26 +83,17 @@ public:
 
 };
 
-class UnknownComplexTypeError : public Exception
+class BackendNotFoundError : public Exception
 {
-    std::string _typeName;
-
-private:
-    static inline std::string demangle(const char *name)
-    {
-        int status;
-        char *demangled = abi::__cxa_demangle(name, nullptr, nullptr, &status);
-        std::string result = demangled ?: name;
-
-        free(demangled);
-        return result;
-    }
-
 public:
-    explicit UnknownComplexTypeError(const std::type_info &type) : _typeName(demangle(type.name())), Exception("Unknown complex type \"" + std::string(demangle(type.name())) + "\"") {}
+    explicit BackendNotFoundError(const std::string &name) : Exception("Backend \"" + name + "\" not found in registry") {}
 
+};
+
+class BackendDuplicatedError : public Exception
+{
 public:
-    const std::string &typeName(void) const { return _typeName; }
+    explicit BackendDuplicatedError(const std::string &name) : Exception("Backend \"" + name + "\" duplicated in registry") {}
 
 };
 }

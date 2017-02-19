@@ -42,7 +42,7 @@ struct SerializableWrapper : public Internal::Serializable
         BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_DECL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                                          \
     };                                                                                                                                  \
                                                                                                                                         \
-    static ::SimpleRPC::Internal::Descriptor<type> __SimpleRPC_ ## type ## _Descriptor_DO_NOT_TOUCH_THIS_VARIABLE__ [[gnu::unused]] ({  \
+    static ::SimpleRPC::Internal::Descriptor<type> __SimpleRPC_Descriptor_ ## type ## _DO_NOT_TOUCH_THIS_VARIABLE__ [[gnu::unused]] ({  \
         BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_REFL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                                          \
     });
 

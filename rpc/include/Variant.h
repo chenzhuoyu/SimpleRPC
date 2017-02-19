@@ -334,6 +334,21 @@ public:
             return *_object.at(key);
     }
 
+/** BEGIN :: these methods will be used by serialization / deserialization backend, see `backend/Backend.h` **/
+
+private:
+    friend class Backend;
+
+protected:
+    Array &internalArray(void) { return _array; }
+    Object &internalObject(void) { return _object; }
+
+protected:
+    const Array &internalArray(void) const { return _array; }
+    const Object &internalObject(void) const { return _object; }
+
+/** END **/
+
 private:
     template <typename ... Args>
     struct ArrayBuilder;

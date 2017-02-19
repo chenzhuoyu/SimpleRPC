@@ -5,9 +5,11 @@ set(CMAKE_CXX_STANDARD 14)
 add_definitions(-D_BSD_SOURCE)
 
 include_directories(
-        ${CMAKE_SOURCE_DIR}/rpc/include)
+        ${CMAKE_SOURCE_DIR}/rpc/include
+        ${CMAKE_SOURCE_DIR}/rpc/include/backend)
 
 set(SIMPLE_RPC
+        rpc/include/backend/Backend.h
         rpc/include/Exceptions.h
         rpc/include/Functional.h
         rpc/include/Inspector.h
@@ -15,7 +17,8 @@ set(SIMPLE_RPC
         rpc/include/Serializable.h
         rpc/include/TypeInfo.h
         rpc/include/Variant.h
+        rpc/src/backend/Backend.cpp
         rpc/src/Registry.cpp)
 
 add_executable(SimpleRPC ${SIMPLE_RPC} main.cpp)
-target_link_libraries(SimpleRPC msgpackc)
+target_link_libraries(SimpleRPC)

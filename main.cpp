@@ -1,4 +1,5 @@
 #include <iostream>
+#include "Backend.h"
 #include "Serializable.h"
 
 defineClass(Foo,
@@ -14,6 +15,25 @@ defineClass(Test,
     declareMethod(int, test, long x, std::string y),
     declareMethod(int, test2, long x, std::string y, std::vector<int> p, Foo q)
 )
+
+struct TestBackend
+{
+    std::string name(void) const { return "TestBackend"; }
+
+    SimpleRPC::Variant parse(const std::string &data) const
+    {
+        fprintf(stderr, "parse: %s\n", data.c_str());
+        return SimpleRPC::Variant(12345);
+    }
+
+    std::string assemble(const SimpleRPC::Variant &object) const
+    {
+        fprintf(stderr, "assemble: %s\n", object.toString().c_str());
+        return "response";
+    }
+};
+
+defineBackend(TestBackend)
 
 int Test::test(long x, std::string y)
 {
@@ -46,6 +66,11 @@ int Test::test2(long x, std::string y, std::vector<int> p, Foo q)
 
 int main()
 {
+    /* duck-typing backend support test */
+    SimpleRPC::Variant v = SimpleRPC::Backend::parse("hello, world");
+    fprintf(stderr, "%s\n", v.toString().c_str());
+    fprintf(stderr, "%s\n", SimpleRPC::Backend::assemble(v).c_str());
+
     /* class lookup, the leading "4" is because of C++ name mangling, for more details please Google it */
     const SimpleRPC::Serializable::Meta &meta = SimpleRPC::Registry::findClass("{4Test}");
 
@@ -69,7 +94,7 @@ int main()
     fprintf(stderr, "%s::%s\n", meta.name().c_str(), method1->name().c_str());
 
     /* invoke method using reflection */
-    fprintf(stderr, "result: %d\n", method1->invoke(test.get(), SimpleRPC::Variant::array((int64_t)123, "hello, world")).get<int>());
+    fprintf(stderr, "result: %s\n", method1->invoke(test.get(), SimpleRPC::Variant::array((int64_t)123, "hello, world")).toString().c_str());
 
     /* test serialize */
     fprintf(stderr, "serialize: %s\n", test->serialize().toString().c_str());
@@ -81,7 +106,7 @@ int main()
     fprintf(stderr, "%s::%s\n", meta.name().c_str(), method2->name().c_str());
 
     /* invoke method using reflection */
-    fprintf(stderr, "result: %d\n", method2->invoke(test.get(),
+    fprintf(stderr, "result: %s\n", method2->invoke(test.get(),
         SimpleRPC::Variant::array(
             (int64_t)999,
             "sdfdfg",
@@ -90,6 +115,6 @@ int main()
                 { "x", SimpleRPC::Variant::array("hello", "world") }
             })
         )
-    ).get<int>());
+    ).toString().c_str());
     return 0;
 }
