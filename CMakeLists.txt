@@ -10,14 +10,18 @@ include_directories(
 
 set(SIMPLE_RPC
         rpc/include/backend/Backend.h
+        rpc/include/backend/MessagePackBackend.h
+        rpc/include/ByteSeq.h
         rpc/include/Exceptions.h
         rpc/include/Functional.h
         rpc/include/Inspector.h
         rpc/include/Registry.h
-        rpc/include/Serializable.h
+        rpc/include/SimpleRPC.h
         rpc/include/TypeInfo.h
         rpc/include/Variant.h
         rpc/src/backend/Backend.cpp
+        rpc/src/backend/MessagePackBackend.cpp
+        rpc/src/ByteSeq.cpp
         rpc/src/Registry.cpp)
 
 add_executable(SimpleRPC ${SIMPLE_RPC} main.cpp)

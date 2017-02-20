@@ -1,6 +1,6 @@
 #include <iostream>
 #include "Backend.h"
-#include "Serializable.h"
+#include "SimpleRPC.h"
 
 defineClass(Foo,
     defineField(std::vector<std::string>, x),
@@ -12,33 +12,14 @@ defineClass(Test,
     defineField(std::string, b),
     defineField(std::vector<Foo>, c),
 
-    declareMethod(int, test, long x, std::string y),
+    declareMethod(int, test, long x, std::string y, bool z),
     declareMethod(int, test2, long x, std::string y, std::vector<int> p, Foo q)
 )
 
-struct TestBackend
-{
-    std::string name(void) const { return "TestBackend"; }
-
-    SimpleRPC::Variant parse(const std::string &data) const
-    {
-        fprintf(stderr, "parse: %s\n", data.c_str());
-        return SimpleRPC::Variant(12345);
-    }
-
-    std::string assemble(const SimpleRPC::Variant &object) const
-    {
-        fprintf(stderr, "assemble: %s\n", object.toString().c_str());
-        return "response";
-    }
-};
-
-defineBackend(TestBackend)
-
-int Test::test(long x, std::string y)
+int Test::test(long x, std::string y, bool z)
 {
     fprintf(stderr, "=====\n");
-    fprintf(stderr, "test : this: %p, this->a: %d, x: %ld, y: %s, this->b: %s\n", this, a, x, y.c_str(), b.c_str());
+    fprintf(stderr, "test : this: %p, this->a: %d, x: %ld, y: %s, z: %s, this->b: %s\n", this, a, x, y.c_str(), z ? "true" : "false", b.c_str());
     for (const auto &p : c)
         for (const auto &q : p.x)
             fprintf(stderr, "c[].x: %s\n", q.c_str());
@@ -66,19 +47,14 @@ int Test::test2(long x, std::string y, std::vector<int> p, Foo q)
 
 int main()
 {
-    /* duck-typing backend support test */
-    SimpleRPC::Variant v = SimpleRPC::Backend::parse("hello, world");
-    fprintf(stderr, "%s\n", v.toString().c_str());
-    fprintf(stderr, "%s\n", SimpleRPC::Backend::assemble(v).c_str());
-
     /* class lookup, the leading "4" is because of C++ name mangling, for more details please Google it */
     const SimpleRPC::Serializable::Meta &meta = SimpleRPC::Registry::findClass("{4Test}");
 
     /* instaniate using reflection */
-    std::shared_ptr<Test> test(meta.newInstance<Test>());
+    std::shared_ptr<Test> origTest(meta.newInstance<Test>());
 
     /* set field using deserialization */
-    test->deserialize(SimpleRPC::Variant::object({
+    origTest->deserialize(SimpleRPC::Variant::object({
         { "a", 156814 },
         { "b", "test deserialze" },
         { "c", SimpleRPC::Variant::array(
@@ -87,14 +63,24 @@ int main()
         )},
     }));
 
+    /* serialization & deserialization test */
+    SimpleRPC::ByteSeq bytes = SimpleRPC::Backend::assemble(origTest->serialize());
+    fprintf(stderr, "serialzed: %s\n", bytes.repr().c_str());
+
+    SimpleRPC::Variant object = SimpleRPC::Backend::parse(std::move(bytes));
+    std::shared_ptr<Test> test(meta.newInstance<Test>());
+
+    fprintf(stderr, "deserialized: %s\n", object.toString().c_str());
+    test->deserialize(object);
+
     /* method lookup, the method name is it's signature */
-    const std::shared_ptr<SimpleRPC::Method> &method1 = meta.methods().at("test(qs)i");
+    const std::shared_ptr<SimpleRPC::Method> &method1 = meta.methods().at("test(qs?)i");
 
     /* print method's name signature */
     fprintf(stderr, "%s::%s\n", meta.name().c_str(), method1->name().c_str());
 
     /* invoke method using reflection */
-    fprintf(stderr, "result: %s\n", method1->invoke(test.get(), SimpleRPC::Variant::array((int64_t)123, "hello, world")).toString().c_str());
+    fprintf(stderr, "result: %s\n", method1->invoke(test.get(), SimpleRPC::Variant::array((int64_t)123, "hello, world", true)).toString().c_str());
 
     /* test serialize */
     fprintf(stderr, "serialize: %s\n", test->serialize().toString().c_str());

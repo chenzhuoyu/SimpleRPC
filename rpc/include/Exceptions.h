@@ -69,6 +69,27 @@ public:
 
 };
 
+class SerializerError : public Exception
+{
+public:
+    explicit SerializerError(const std::string &message) : Exception(message) {}
+
+};
+
+class DeserializerError : public Exception
+{
+public:
+    explicit DeserializerError(const std::string &message) : Exception(message) {}
+
+};
+
+class BufferOverflowError : public Exception
+{
+public:
+    explicit BufferOverflowError(size_t size) : Exception("Buffer overflow : " + std::to_string(size)) {}
+
+};
+
 class ClassNotFoundError : public Exception
 {
 public:

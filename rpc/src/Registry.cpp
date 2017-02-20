@@ -3,29 +3,33 @@
 #include "Inspector.h"
 #include "Exceptions.h"
 
+namespace SimpleRPC
+{
+namespace Internal
+{
 /* class factory registry */
-static std::unordered_map<std::string, std::shared_ptr<SimpleRPC::Internal::Registry::Meta>> _registry;
+static std::unordered_map<std::string, std::shared_ptr<Registry::Meta>> _registry;
 
-void SimpleRPC::Internal::Registry::addClass(std::shared_ptr<SimpleRPC::Internal::Registry::Meta> &&meta)
+void Registry::addClass(std::shared_ptr<Registry::Meta> &&meta)
 {
     if (_registry.find(meta->name()) == _registry.end())
         _registry.insert({ meta->name(), meta });
     else
-        throw SimpleRPC::Exceptions::ClassDuplicatedError(meta->name());
+        throw Exceptions::ClassDuplicatedError(meta->name());
 }
 
-const SimpleRPC::Internal::Registry::Meta &SimpleRPC::Internal::Registry::findClass(const std::string &name)
+const Registry::Meta &Registry::findClass(const std::string &name)
 {
     if (_registry.find(name) != _registry.end())
         return *_registry.at(name);
     else
-        throw SimpleRPC::Exceptions::ClassNotFoundError(name);
+        throw Exceptions::ClassNotFoundError(name);
 }
 
-SimpleRPC::Internal::Variant SimpleRPC::Internal::Serializable::serialize(void) const
+Variant Serializable::serialize(void) const
 {
     /* create object type */
-    Variant result(Type::TypeCode::Struct);
+    Variant result(Type::TypeCode::Object);
 
     /* serialize each field */
     for (const auto &field : _meta->fields())
@@ -34,9 +38,9 @@ SimpleRPC::Internal::Variant SimpleRPC::Internal::Serializable::serialize(void) 
     return result;
 }
 
-void SimpleRPC::Internal::Serializable::deserialize(const SimpleRPC::Internal::Variant &value)
+void Serializable::deserialize(const Variant &value)
 {
-    if (value.type() != Type::TypeCode::Struct)
+    if (value.type() != Type::TypeCode::Object)
         throw Exceptions::TypeError(value.toString() + " is not an object");
 
     auto keys = value.keys();
@@ -53,4 +57,6 @@ void SimpleRPC::Internal::Serializable::deserialize(const SimpleRPC::Internal::V
         else
             throw Exceptions::ReflectionError("Missing field \"" + field.first + "\"");
     }
+}
+}
 }

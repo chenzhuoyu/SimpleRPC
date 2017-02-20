@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <typeinfo>
+#include <functional>
 #include <type_traits>
 #include <unordered_map>
 
@@ -112,19 +113,17 @@ struct ParamTuple;
 template <typename Item, typename ... Items>
 struct ParamTuple<Item, Items ...>
 {
-    static std::tuple<Item, Items ...> expand(const Variant &array, int pos = 0)
+    static std::tuple<Item, Items ...> expand(const Variant &array)
     {
-        return std::tuple_cat(
-            std::make_tuple(array[pos].get<Item>()),
-            ParamTuple<Items ...>::expand(array, pos + 1)
-        );
+        const size_t p = array.size() - sizeof ... (Items) - 1;
+        return std::tuple_cat(std::make_tuple(array[p].get<Item>()), ParamTuple<Items ...>::expand(array));
     }
 };
 
 template <>
 struct ParamTuple<>
 {
-    static std::tuple<> expand(const Variant &, int)
+    static std::tuple<> expand(const Variant &)
     {
         /* final recursion, no arguments left */
         return std::tuple<>();

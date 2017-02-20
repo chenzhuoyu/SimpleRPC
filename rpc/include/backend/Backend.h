@@ -5,9 +5,11 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 #include <type_traits>
 #include <unordered_map>
 
+#include "ByteSeq.h"
 #include "Variant.h"
 #include "Exceptions.h"
 
@@ -34,7 +36,7 @@ struct ParserCheck
 };
 
 template <typename T>
-struct ParserCheck<Variant(T::*)(const std::string &) const>
+struct ParserCheck<Variant(T::*)(ByteSeq &&) const>
 {
     static constexpr bool value = true;
 };
@@ -46,7 +48,7 @@ struct AssemblerCheck
 };
 
 template <typename T>
-struct AssemblerCheck<std::string(T::*)(const Variant &) const>
+struct AssemblerCheck<ByteSeq(T::*)(Variant &&) const>
 {
     static constexpr bool value = true;
 };
@@ -55,17 +57,17 @@ struct Backend final
 {
     class BackendProxy
     {
-        std::function<Variant(const std::string &)> _parser;
-        std::function<std::string(const Variant &)> _assembler;
+        std::function<Variant(ByteSeq &&)> _parser;
+        std::function<ByteSeq(Variant &&)> _assembler;
 
     public:
         explicit BackendProxy(
-            std::function<Variant(const std::string &)> parser,
-            std::function<std::string(const Variant &)> assembler) : _parser(parser), _assembler(assembler) {}
+            std::function<Variant(ByteSeq &&)> parser,
+            std::function<ByteSeq(Variant &&)> assembler) : _parser(parser), _assembler(assembler) {}
 
     public:
-        Variant parse(const std::string &data) const { return _parser(data); }
-        std::string assemble(const Variant &data) const { return _assembler(data); }
+        Variant parse(ByteSeq &&data) const { return _parser(std::move(data)); }
+        ByteSeq assemble(Variant &&data) const { return _assembler(std::move(data)); }
 
     };
 
@@ -81,7 +83,7 @@ public:
         static_assert(
             Internal::ParserCheck<decltype(&T::parse)>::value &&
             Internal::AssemblerCheck<decltype(&T::assemble)>::value,
-            "Backend must have `bool parse(const std::string &) const` and `std::string assemble(const Variant &) const` methods"
+            "Backend must have `Variant parse(ByteSeq &&) const` and `ByteSeq assemble(Variant &&) const` methods"
         );
 
         /* check for backend existence */
@@ -90,8 +92,8 @@ public:
 
         /* build backend proxy and add to registry */
         _backends.insert({ name, std::make_shared<BackendProxy>(
-            [=](const std::string &data) { return backend->parse(data);    },
-            [=](const Variant     &data) { return backend->assemble(data); }
+            [=](ByteSeq &&data) { return backend->parse(std::move(data)); },
+            [=](Variant &&data) { return backend->assemble(std::move(data)); }
         ) });
 
         /* set as default backend if not specified */
@@ -129,8 +131,8 @@ public:
     static void setDefaultBackend(const std::string &name) { _defaultBackend = findBackend(name); }
 
 public:
-    static Variant parse(const std::string &data) { return defaultBackend()->parse(data); }
-    static std::string assemble(const Variant &object) { return defaultBackend()->assemble(object); }
+    static Variant parse(ByteSeq &&data) { return defaultBackend()->parse(std::move(data)); }
+    static ByteSeq assemble(Variant &&object) { return defaultBackend()->assemble(std::move(object)); }
 
 public:
     template <typename T>
@@ -150,7 +152,8 @@ public:
 };
 }
 
-/* export `Backend` class */
+/* export some useful classes */
+typedef Internal::ByteSeq ByteSeq;
 typedef Internal::Backend Backend;
 }
 

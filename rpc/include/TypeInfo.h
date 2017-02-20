@@ -39,15 +39,15 @@ public:
         Float,
         Double,
 
+        /* boolean */
+        Boolean,
+
         /* STL string */
         String,
 
         /* compond types */
         Array,
-        Struct,
-
-        /* used for counting number of types, not actually a type */
-        TypeCount
+        Object
     };
 
 private:
@@ -57,9 +57,9 @@ public:
     /* primitive types */
     Type(TypeCode typeCode) : _typeCode(typeCode)
     {
-        if (typeCode == TypeCode::Array || typeCode == TypeCode::Struct)
+        if (typeCode == TypeCode::Array || typeCode == TypeCode::Object)
         {
-            fprintf(stderr, "assert_failed(): typeCode != TypeCode::Array && typeCode != TypeCode::Struct");
+            fprintf(stderr, "assert_failed(): typeCode != TypeCode::Array && typeCode != TypeCode::Object");
             abort();
         }
     }
@@ -76,12 +76,12 @@ public:
     }
 
 public:
-    /* struct type */
-    explicit Type(TypeCode typeCode, const std::string &className) : _typeCode(TypeCode::Struct), _className(className)
+    /* object type */
+    explicit Type(TypeCode typeCode, const std::string &className) : _typeCode(TypeCode::Object), _className(className)
     {
-        if (typeCode != TypeCode::Struct)
+        if (typeCode != TypeCode::Object)
         {
-            fprintf(stderr, "assert_failed(): typeCode == TypeCode::Struct");
+            fprintf(stderr, "assert_failed(): typeCode == TypeCode::Object");
             abort();
         }
     }
@@ -116,9 +116,10 @@ public:
 
             case TypeCode::Float    : return "f";
             case TypeCode::Double   : return "d";
+            case TypeCode::Boolean  : return "?";
 
             case TypeCode::String   : return "s";
-            case TypeCode::Struct   : return "{" + _className + "}";
+            case TypeCode::Object   : return "{" + _className + "}";
             case TypeCode::Array    : return "[" + _itemType->toSignature() + "]";
 
             default:
@@ -200,7 +201,7 @@ struct TypeHelper<false, false, true, Item>
     static Type type(void)
     {
         /* structure types */
-        return Type(Type::TypeCode::Struct, typeid(Item).name());
+        return Type(Type::TypeCode::Object, typeid(Item).name());
     }
 };
 
@@ -234,15 +235,11 @@ struct TypeItem<std::vector<Item>>
 template <> struct TypeItem<float > { static Type type(void) { return Type::TypeCode::Float; } };
 template <> struct TypeItem<double> { static Type type(void) { return Type::TypeCode::Double; } };
 
+/* boolean */
+template <> struct TypeItem<bool> { static Type type(void) { return Type::TypeCode::Boolean; } };
+
 /* STL string */
 template <> struct TypeItem<std::string> { static Type type(void) { return Type::TypeCode::String; } };
-
-/* constant references */
-template <typename T>
-struct TypeItem<const T &> : public TypeItem<T>
-{
-    /* this is just for removing reference */
-};
 
 /****** Type array resolvers ******/
 

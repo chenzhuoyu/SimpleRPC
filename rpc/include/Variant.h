@@ -16,6 +16,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "ByteSeq.h"
 #include "TypeInfo.h"
 #include "Registry.h"
 #include "Exceptions.h"
@@ -39,21 +40,23 @@ class Variant final
         uint32_t _u32;
         uint64_t _u64;
 
+        bool     _bool;
         float    _float;
         double   _double;
 
         /* used by copy constructor and move constructor / assignment */
         uint8_t  _buffer[Functional::max(
-            sizeof(int8_t  ),
-            sizeof(int16_t ),
-            sizeof(int32_t ),
-            sizeof(int64_t ),
-            sizeof(uint8_t ),
-            sizeof(uint16_t),
-            sizeof(uint32_t),
-            sizeof(uint64_t),
-            sizeof(float   ),
-            sizeof(double  )
+            sizeof(int8_t   ),
+            sizeof(int16_t  ),
+            sizeof(int32_t  ),
+            sizeof(int64_t  ),
+            sizeof(uint8_t  ),
+            sizeof(uint16_t ),
+            sizeof(uint32_t ),
+            sizeof(uint64_t ),
+            sizeof(bool     ),
+            sizeof(float    ),
+            sizeof(double   )
         )];
     };
 
@@ -89,6 +92,9 @@ public:
     Variant(double value) : _type(Type::TypeCode::Double), _double(value) {}
 
 public:
+    Variant(bool value) : _type(Type::TypeCode::Boolean), _bool(value) {}
+
+public:
     Variant(const char        *value) : _type(Type::TypeCode::String), _string(value) {}
     Variant(const std::string &value) : _type(Type::TypeCode::String), _string(value) {}
 
@@ -102,16 +108,16 @@ public:
 
 public:
     template <typename T, typename = std::enable_if_t<std::is_convertible<T *, Serializable *>::value, void>>
-    Variant(const T &value) : _type(Type::TypeCode::Struct) { assign(value.serialize()); }
+    Variant(const T &value) : _type(Type::TypeCode::Object) { assign(value.serialize()); }
 
 public:
-    Variant(Variant &&other)      { swap(std::move(other)); }
-    Variant(const Variant &other) { assign(other);          }
+    Variant(Variant &&other)      { swap(other);   }
+    Variant(const Variant &other) { assign(other); }
 
 public:
     Variant &operator=(Variant &&other)
     {
-        swap(std::move(other));
+        swap(other);
         return *this;
     }
 
@@ -123,7 +129,7 @@ public:
     }
 
 public:
-    void swap(Variant &&other)
+    void swap(Variant &other)
     {
         std::swap(_type, other._type);
         std::swap(_array, other._array);
@@ -254,7 +260,7 @@ private:
     inline std::enable_if_t<std::is_convertible<T *, Serializable *>::value, void> getValue(T &v) const
     {
         /* it's ensured to be convertible to `Serializable` as `std:enable_if_t<...>` says */
-        if (_type == Type::TypeCode::Struct)
+        if (_type == Type::TypeCode::Object)
             v.deserialize(*this);
         else
             throw Exceptions::TypeError(toString() + " is not an object");
@@ -281,7 +287,7 @@ public:
 public:
     std::vector<std::string> keys(void) const
     {
-        if (_type != Type::TypeCode::Struct)
+        if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
 
         std::vector<std::string> result(_object.size());
@@ -314,7 +320,7 @@ public:
 public:
     Variant &operator[](const std::string &key)
     {
-        if (_type != Type::TypeCode::Struct)
+        if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
         else if (_object.find(key) == _object.end())
             _object.insert({ key, std::make_shared<Variant>(0) });
@@ -326,7 +332,7 @@ public:
 public:
     const Variant &operator[](const std::string &key) const
     {
-        if (_type != Type::TypeCode::Struct)
+        if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
         else if (_object.find(key) == _object.end())
             throw Exceptions::NameError(key);
@@ -400,7 +406,7 @@ public:
     static Variant object(std::initializer_list<VariantPair> list)
     {
         /* create object type */
-        Variant result(Type::TypeCode::Struct);
+        Variant result(Type::TypeCode::Object);
 
         /* fill each key-value pair */
         for (const auto &pair : list)
@@ -409,132 +415,32 @@ public:
         return result;
     }
 
-#define cache_def()             \
-    int cp = 0;                 \
-    char cache[256] = {0};
-
-#define cache_char(c)           \
-    do                          \
-    {                           \
-        cache[cp] = (c);        \
-        if (++cp == 255)        \
-            cache_flush();      \
-    } while (0)
-
-#define cache_flush()           \
-    do                          \
-    {                           \
-        if (cp)                 \
-        {                       \
-            cache[cp] = 0;      \
-            result += cache;    \
-            cp = 0;             \
-        }                       \
-    } while (0)
-
-public:
-    static std::string escapeString(const std::string &s)
-    {
-        size_t n = s.size();
-        const char *p = s.data();
-
-        cache_def();
-        std::string result = "\"";
-
-        while (n--)
-        {
-            char ch = *p++;
-
-            if (ch == '\"')
-            {
-                cache_char('\\');
-                cache_char(ch);
-                continue;
-            }
-
-            switch (ch)
-            {
-                case '\\':
-                {
-                    cache_char('\\');
-                    cache_char('\\');
-                    break;
-                }
-
-                case '\t':
-                {
-                    cache_char('\\');
-                    cache_char('t');
-                    break;
-                }
-
-                case '\n':
-                {
-                    cache_char('\\');
-                    cache_char('n');
-                    break;
-                }
-
-                case '\r':
-                {
-                    cache_char('\\');
-                    cache_char('r');
-                    break;
-                }
-
-                default:
-                {
-                    if (ch >= ' ' && ch < 0x7f)
-                    {
-                        cache_char(ch);
-                        break;
-                    }
-
-    #define to_hex(n)   (((n) < 10) ? ((n) + '0') : ((n) - 10 + 'a'))
-
-                    cache_char('\\');
-                    cache_char('x');
-                    cache_char(to_hex(((ch & 0xF0) >> 4)));
-                    cache_char(to_hex(((ch & 0x0F) >> 0)));
-                    break;
-
-    #undef to_hex
-                }
-            }
-        }
-
-        cache_char('\"');
-        cache_flush();
-        return result;
-    }
-
-#undef cache_def
-#undef cache_char
-#undef cache_flush
-
 public:
     std::string toString(void) const
     {
         switch (_type)
         {
             /* signed integers */
-            case Type::TypeCode::Int8   : return "int8_t("  + std::to_string(_s8 ) + ")";
-            case Type::TypeCode::Int16  : return "int16_t(" + std::to_string(_s16) + ")";
-            case Type::TypeCode::Int32  : return "int32_t(" + std::to_string(_s32) + ")";
-            case Type::TypeCode::Int64  : return "int64_t(" + std::to_string(_s64) + ")";
+            case Type::TypeCode::Int8       : return "int8_t("  + std::to_string(_s8 ) + ")";
+            case Type::TypeCode::Int16      : return "int16_t(" + std::to_string(_s16) + ")";
+            case Type::TypeCode::Int32      : return "int32_t(" + std::to_string(_s32) + ")";
+            case Type::TypeCode::Int64      : return "int64_t(" + std::to_string(_s64) + ")";
 
             /* unsigned integers */
-            case Type::TypeCode::UInt8  : return "uint8_t("  + std::to_string(_u8 ) + ")";
-            case Type::TypeCode::UInt16 : return "uint16_t(" + std::to_string(_u16) + ")";
-            case Type::TypeCode::UInt32 : return "uint32_t(" + std::to_string(_u32) + ")";
-            case Type::TypeCode::UInt64 : return "uint64_t(" + std::to_string(_u64) + ")";
+            case Type::TypeCode::UInt8      : return "uint8_t("  + std::to_string(_u8 ) + ")";
+            case Type::TypeCode::UInt16     : return "uint16_t(" + std::to_string(_u16) + ")";
+            case Type::TypeCode::UInt32     : return "uint32_t(" + std::to_string(_u32) + ")";
+            case Type::TypeCode::UInt64     : return "uint64_t(" + std::to_string(_u64) + ")";
 
             /* floating point numbers */
-            case Type::TypeCode::Float  : return "float("  + std::to_string(_float ) + ")";
-            case Type::TypeCode::Double : return "double(" + std::to_string(_double) + ")";
+            case Type::TypeCode::Float      : return "float("  + std::to_string(_float ) + ")";
+            case Type::TypeCode::Double     : return "double(" + std::to_string(_double) + ")";
+
+            /* boolean */
+            case Type::TypeCode::Boolean    : return "boolean(" + std::string(_bool ? "true" : "false") + ")";
 
             /* STL string */
-            case Type::TypeCode::String : return Variant::escapeString(_string);
+            case Type::TypeCode::String     : return ByteSeq::repr(_string);
 
             /* arrays */
             case Type::TypeCode::Array:
@@ -554,14 +460,14 @@ public:
             }
 
             /* structs */
-            case Type::TypeCode::Struct:
+            case Type::TypeCode::Object:
             {
                 std::ostringstream oss;
                 std::vector<std::string> items;
 
                 for (const auto &item : _object)
                 {
-                    items.push_back(Variant::escapeString(item.first) + ": " + item.second->toString());
+                    items.push_back(ByteSeq::repr(item.first) + ": " + item.second->toString());
                     items.push_back(", ");
                 }
 
@@ -598,6 +504,17 @@ inline double Variant::get<double>(void) const
         return _double;
     else
         throw Exceptions::TypeError(toString() + " is not a double");
+}
+
+/* boolean */
+
+template <>
+inline bool Variant::get<bool>(void) const
+{
+    if (_type == Type::TypeCode::Boolean)
+        return _bool;
+    else
+        throw Exceptions::TypeError(toString() + " is not a boolean");
 }
 
 /* STL string, reference version */
