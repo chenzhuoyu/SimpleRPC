@@ -97,15 +97,15 @@ struct Serializable
 {
     typedef Registry::Meta Meta;
 
-protected:
-    const Meta *_meta;
+private:
+    const Meta &_meta;
 
 protected:
     virtual ~Serializable() {}
-    explicit Serializable() {}
+    explicit Serializable(const Meta &meta) : _meta(meta) {}
 
 public:
-    const Meta &meta(void) const { return *_meta; }
+    const Meta &meta(void) const { return _meta; }
 
 public:
     Variant serialize(void) const;

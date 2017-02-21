@@ -17,13 +17,10 @@ typedef Internal::Registry      Registry;
 typedef Internal::Serializable  Serializable;
 
 template <typename T>
-struct SerializableWrapper : public Internal::Serializable
+struct SerializableWrapper : public Serializable
 {
-    explicit SerializableWrapper()
-    {
-        /* load meta-data from registry */
-        _meta = &(Registry::findClass(Internal::Signature<T>::resolve()));
-    }
+    explicit SerializableWrapper() :
+        Serializable(Registry::findClass(Internal::Signature<T>::resolve())) {}
 };
 }
 
