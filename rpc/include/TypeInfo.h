@@ -88,7 +88,7 @@ public:
 
 public:
     TypeCode typeCode(void) const { return _typeCode; }
-    std::string className(void) const { return _className; }
+    const std::string &className(void) const { return _className; }
 
 public:
     const Type &itemType(void) const
@@ -121,12 +121,6 @@ public:
             case TypeCode::String   : return "s";
             case TypeCode::Object   : return "{" + _className + "}";
             case TypeCode::Array    : return "[" + _itemType->toSignature() + "]";
-
-            default:
-            {
-                fprintf(stderr, "*** FATAL: impossible type %d\n", static_cast<int>(_typeCode));
-                abort();
-            }
         }
     }
 };
