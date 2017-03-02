@@ -475,12 +475,6 @@ public:
                 std::copy(items.begin(), items.end(), std::ostream_iterator<std::string>(oss));
                 return "{" + oss.str() + "}";
             }
-
-            default:
-            {
-                fprintf(stderr, "*** FATAL: impossible type %d", (int)_type);
-                abort();
-            }
         }
     }
 };
