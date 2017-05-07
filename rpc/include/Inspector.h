@@ -85,7 +85,7 @@ private:
     Method &operator=(const Method &) = delete;
 
 public:
-    typedef std::function<Variant(Serializable *, const Variant &)> Proxy;
+    typedef std::function<Variant(Serializable *, Variant &)> Proxy;
 
 private:
     Proxy _proxy;
@@ -101,7 +101,8 @@ public:
     const std::vector<Type> &args(void) const { return _args; }
 
 public:
-    Variant invoke(Serializable *self, const Variant &args) const { return _proxy(self, args); }
+    Variant invoke(Serializable *self, Variant &args) const { return _proxy(self, args); }
+    Variant invoke(Serializable *self, Variant &&args) const { return _proxy(self, args); }
 
 };
 
@@ -113,17 +114,17 @@ struct ParamTuple;
 template <typename Item, typename ... Items>
 struct ParamTuple<Item, Items ...>
 {
-    static std::tuple<Item, Items ...> expand(const Variant &array)
+    static std::tuple<Item, Items ...> expand(Variant &array)
     {
-        const size_t p = array.size() - sizeof ... (Items) - 1;
-        return std::tuple_cat(std::make_tuple(array[p].get<Item>()), ParamTuple<Items ...>::expand(array));
+        size_t index = array.size() - sizeof ... (Items) - 1;
+        return std::tuple_cat(std::forward_as_tuple(array[index].get<Item>()), ParamTuple<Items ...>::expand(array));
     }
 };
 
 template <>
 struct ParamTuple<>
 {
-    static std::tuple<> expand(const Variant &)
+    static std::tuple<> expand(Variant &)
     {
         /* final recursion, no arguments left */
         return std::tuple<>();
@@ -171,7 +172,7 @@ public:
                 TypeItem<Result>::type(),
                 TypeArray<Args ...>::type(),
                 Signature<Result (T::*)(Args ...)>::resolve(),
-                [=](Serializable *self, const Variant &argv)
+                [=](Serializable *self, Variant &argv)
                 {
                     /* check for parameter count and invoke target method with parameter array */
                     if (argv.size() != sizeof ... (Args))

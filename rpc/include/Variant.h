@@ -6,9 +6,6 @@
 #include <string>
 #include <memory>
 #include <vector>
-#include <sstream>
-#include <iterator>
-#include <algorithm>
 #include <unordered_map>
 
 #include <float.h>
@@ -102,8 +99,23 @@ public:
     template <typename T>
     Variant(const std::vector<T> &value) : _type(Type::TypeCode::Array)
     {
+        /* reserve space to prevent frequent malloc */
+        _array.reserve(value.size());
+
+        /* append every item */
         for (const auto &item : value)
             _array.push_back(std::make_shared<Variant>(item));
+    }
+
+public:
+    Variant(std::initializer_list<Variant> list) : _type(Type::TypeCode::Array)
+    {
+        /* reserve space to prevent frequent malloc */
+        _array.reserve(list.size());
+
+        /* append every item */
+        for (auto &item : list)
+            _array.push_back(std::make_shared<Variant>(std::move(item)));
     }
 
 public:
@@ -156,90 +168,139 @@ public:
     Type::TypeCode type(void) const { return _type; }
 
 private:
-    template <size_t size, typename T>
-    inline T getSigned(void) const
+    struct Tag {};
+
+/** signed integers **/
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int8_t>::value, Tag> = Tag())
     {
-        /* these `if` statement would be optimized away by compiler since `size` is literally a constant */
-        if (size == sizeof(int8_t))
-        {
-            if (_type == Type::TypeCode::Int8)
-                return static_cast<T>(_s8);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `int8_t`");
-        }
-        else if (size == sizeof(int16_t))
-        {
-            if (_type == Type::TypeCode::Int16)
-                return static_cast<T>(_s16);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `int16_t`");
-        }
-        else if (size == sizeof(int32_t))
-        {
-            if (_type == Type::TypeCode::Int32)
-                return static_cast<T>(_s32);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `int32_t`");
-        }
-        else if (size == sizeof(int64_t))
-        {
-            if (_type == Type::TypeCode::Int64)
-                return static_cast<T>(_s64);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `int64_t`");
-        }
+        if (_type == Type::TypeCode::Int8)
+            return static_cast<T>(_s8);
         else
-        {
-            /* should never reaches here */
-            static_assert(size == sizeof(int8_t) || size == sizeof(int16_t) || size == sizeof(int32_t) || size == sizeof(int64_t), "Unknown signed integer size");
-            abort();
-        }
+            throw Exceptions::TypeError(toString() + " is not an `int8_t`");
     }
 
-private:
-    template <size_t size, typename T>
-    inline T getUnsigned(void) const
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int16_t>::value, Tag> = Tag())
     {
-        /* these `if` statement would be optimized away by compiler since `size` is literally a constant */
-        if (size == sizeof(uint8_t))
-        {
-            if (_type == Type::TypeCode::UInt8)
-                return static_cast<T>(_u8);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `uint8_t`");
-        }
-        else if (size == sizeof(uint16_t))
-        {
-            if (_type == Type::TypeCode::UInt16)
-                return static_cast<T>(_u16);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `uint16_t`");
-        }
-        else if (size == sizeof(uint32_t))
-        {
-            if (_type == Type::TypeCode::UInt32)
-                return static_cast<T>(_u32);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `uint32_t`");
-        }
-        else if (size == sizeof(uint64_t))
-        {
-            if (_type == Type::TypeCode::UInt64)
-                return static_cast<T>(_u64);
-            else
-                throw Exceptions::TypeError(toString() + " is not an `uint64_t`");
-        }
+        if (_type == Type::TypeCode::Int16)
+            return static_cast<T>(_s16);
         else
-        {
-            /* should never reaches here */
-            static_assert(size == sizeof(uint8_t) || size == sizeof(uint16_t) || size == sizeof(uint32_t) || size == sizeof(uint64_t), "Unknown unsigned integer size");
-            abort();
-        }
+            throw Exceptions::TypeError(toString() + " is not an `int16_t`");
     }
 
-private:
-    template <typename T> inline std::enable_if_t<std::is_signed  <T>::value, void> getValue(T &v) const { v = getSigned  <sizeof(T), T>(); }
-    template <typename T> inline std::enable_if_t<std::is_unsigned<T>::value, void> getValue(T &v) const { v = getUnsigned<sizeof(T), T>(); }
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int32_t>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::Int32)
+            return static_cast<T>(_s32);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `int32_t`");
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int64_t>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::Int64)
+            return static_cast<T>(_s64);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `int64_t`");
+    }
+
+/** unsigned integers **/
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint8_t>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::UInt8)
+            return static_cast<T>(_u8);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint8_t`");
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint16_t>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::UInt16)
+            return static_cast<T>(_u16);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint16_t`");
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint32_t>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::UInt32)
+            return static_cast<T>(_u32);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint32_t`");
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint64_t>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::UInt64)
+            return static_cast<T>(_u64);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint64_t`");
+    }
+
+/** floating point numbers **/
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, float>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::Float)
+            return _float;
+        else
+            throw Exceptions::TypeError(toString() + " is not a float");
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, double>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::Double)
+            return _double;
+        else
+            throw Exceptions::TypeError(toString() + " is not a double");
+    }
+
+/** boolean **/
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, bool>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::Boolean)
+            return _bool;
+        else
+            throw Exceptions::TypeError(toString() + " is not a boolean");
+    }
+
+/** STL string **/
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, std::string>::value, Tag> = Tag())
+    {
+        if (_type == Type::TypeCode::String)
+            return _string;
+        else
+            throw Exceptions::TypeError(toString() + " is not a string");
+    }
+
+// TODO: universal getter for arrays and objects
 
 private:
     template <typename T>
@@ -266,14 +327,7 @@ private:
             throw Exceptions::TypeError(toString() + " is not an object");
     }
 
-public:
-    template <typename T>
-    inline T get(void) const
-    {
-        T v;
-        getValue(v);
-        return std::move(v);
-    }
+// END-TODO
 
 public:
     size_t size(void) const
@@ -410,7 +464,7 @@ public:
 
         /* fill each key-value pair */
         for (const auto &pair : list)
-            result._object.insert({ pair.name, pair.value });
+            result._object.emplace(pair.name, pair.value);
 
         return result;
     }
@@ -445,84 +499,39 @@ public:
             /* arrays */
             case Type::TypeCode::Array:
             {
-                std::ostringstream oss;
-                std::vector<std::string> items;
+                std::string result;
 
                 for (const auto &item : _array)
                 {
-                    items.push_back(item->toString());
-                    items.push_back(", ");
+                    if (!result.empty())
+                        result += ", ";
+
+                    result += item->toString();
                 }
 
-                items.pop_back();
-                std::copy(items.begin(), items.end(), std::ostream_iterator<std::string>(oss));
-                return "[" + oss.str() + "]";
+                return "[" + result + "]";
             }
 
             /* structs */
             case Type::TypeCode::Object:
             {
-                std::ostringstream oss;
-                std::vector<std::string> items;
+                std::string result;
 
                 for (const auto &item : _object)
                 {
-                    items.push_back(ByteSeq::repr(item.first) + ": " + item.second->toString());
-                    items.push_back(", ");
+                    if (!result.empty())
+                        result += ", ";
+
+                    result += ByteSeq::repr(item.first);
+                    result += ": ";
+                    result += item.second->toString();
                 }
 
-                items.pop_back();
-                std::copy(items.begin(), items.end(), std::ostream_iterator<std::string>(oss));
-                return "{" + oss.str() + "}";
+                return "{" + result + "}";
             }
         }
     }
 };
-
-/** value getter specializations **/
-
-/* floating point numbers */
-template <>
-inline float Variant::get<float>(void) const
-{
-    if (_type == Type::TypeCode::Float)
-        return _float;
-    else
-        throw Exceptions::TypeError(toString() + " is not a float");
-}
-
-template <>
-inline double Variant::get<double>(void) const
-{
-    if (_type == Type::TypeCode::Double)
-        return _double;
-    else
-        throw Exceptions::TypeError(toString() + " is not a double");
-}
-
-/* boolean */
-
-template <>
-inline bool Variant::get<bool>(void) const
-{
-    if (_type == Type::TypeCode::Boolean)
-        return _bool;
-    else
-        throw Exceptions::TypeError(toString() + " is not a boolean");
-}
-
-/* STL string, reference version */
-template <>
-inline const std::string &Variant::get<const std::string &>(void) const
-{
-    if (_type == Type::TypeCode::String)
-        return _string;
-    else
-        throw Exceptions::TypeError(toString() + " is not a string");
-}
-
-/* STL string, value version */
-template <> inline std::string Variant::get<std::string>(void) const { return get<const std::string &>(); }
 }
 }
 

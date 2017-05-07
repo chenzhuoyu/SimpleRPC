@@ -14,8 +14,6 @@ void Registry::addClass(std::shared_ptr<Registry::Meta> &&meta)
 {
     if (_registry.find(meta->name()) == _registry.end())
         _registry.insert({ meta->name(), meta });
-    else
-        throw Exceptions::ClassDuplicatedError(meta->name());
 }
 
 const Registry::Meta &Registry::findClass(const std::string &name)

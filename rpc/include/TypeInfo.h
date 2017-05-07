@@ -5,6 +5,7 @@
 
 #include <string>
 #include <memory>
+#include <algorithm>
 
 #include "Exceptions.h"
 #include "Functional.h"
@@ -17,6 +18,7 @@ namespace Internal
 
 class Type final
 {
+    bool _isMutable;
     std::string _className;
     std::shared_ptr<Type> _itemType;
 
@@ -55,7 +57,7 @@ private:
 
 public:
     /* primitive types */
-    Type(TypeCode typeCode) : _typeCode(typeCode)
+    explicit Type(TypeCode typeCode, bool isMutable) : _typeCode(typeCode), _isMutable(isMutable)
     {
         if (typeCode == TypeCode::Array || typeCode == TypeCode::Object)
         {
@@ -66,8 +68,15 @@ public:
 
 public:
     /* array sub-item type */
-    explicit Type(TypeCode typeCode, const Type &itemType) : _typeCode(TypeCode::Array), _itemType(new Type(itemType))
+    explicit Type(TypeCode typeCode, const Type &itemType, bool isMutable) :
+        _typeCode(TypeCode::Array), _itemType(new Type(itemType)), _isMutable(isMutable)
     {
+        if (itemType.isMutable())
+        {
+            fprintf(stderr, "assert_failed(): !itemType.isMutable()");
+            abort();
+        }
+
         if (typeCode != TypeCode::Array)
         {
             fprintf(stderr, "assert_failed(): typeCode == TypeCode::Array");
@@ -77,7 +86,8 @@ public:
 
 public:
     /* object type */
-    explicit Type(TypeCode typeCode, const std::string &className) : _typeCode(TypeCode::Object), _className(className)
+    explicit Type(TypeCode typeCode, const std::string &className, bool isMutable) :
+        _typeCode(TypeCode::Object), _className(className), _isMutable(isMutable)
     {
         if (typeCode != TypeCode::Object)
         {
@@ -87,6 +97,7 @@ public:
     }
 
 public:
+    bool isMutable(void) const { return _isMutable; }
     TypeCode typeCode(void) const { return _typeCode; }
     const std::string &className(void) const { return _className; }
 
@@ -102,25 +113,51 @@ public:
 public:
     std::string toSignature(void) const
     {
-        switch (_typeCode)
+        if (!_isMutable)
         {
-            case TypeCode::Int8     : return "b";
-            case TypeCode::Int16    : return "h";
-            case TypeCode::Int32    : return "i";
-            case TypeCode::Int64    : return "q";
+            switch (_typeCode)
+            {
+                case TypeCode::Int8     : return "b";
+                case TypeCode::Int16    : return "h";
+                case TypeCode::Int32    : return "i";
+                case TypeCode::Int64    : return "q";
 
-            case TypeCode::UInt8    : return "B";
-            case TypeCode::UInt16   : return "H";
-            case TypeCode::UInt32   : return "I";
-            case TypeCode::UInt64   : return "Q";
+                case TypeCode::UInt8    : return "B";
+                case TypeCode::UInt16   : return "H";
+                case TypeCode::UInt32   : return "I";
+                case TypeCode::UInt64   : return "Q";
 
-            case TypeCode::Float    : return "f";
-            case TypeCode::Double   : return "d";
-            case TypeCode::Boolean  : return "?";
+                case TypeCode::Float    : return "f";
+                case TypeCode::Double   : return "d";
+                case TypeCode::Boolean  : return "?";
 
-            case TypeCode::String   : return "s";
-            case TypeCode::Object   : return "{" + _className + "}";
-            case TypeCode::Array    : return "[" + _itemType->toSignature() + "]";
+                case TypeCode::String   : return "s";
+                case TypeCode::Object   : return "{" + _className + "}";
+                case TypeCode::Array    : return "[" + _itemType->toSignature() + "]";
+            }
+        }
+        else
+        {
+            switch (_typeCode)
+            {
+                case TypeCode::Int8     : return "b&";
+                case TypeCode::Int16    : return "h&";
+                case TypeCode::Int32    : return "i&";
+                case TypeCode::Int64    : return "q&";
+
+                case TypeCode::UInt8    : return "B&";
+                case TypeCode::UInt16   : return "H&";
+                case TypeCode::UInt32   : return "I&";
+                case TypeCode::UInt64   : return "Q&";
+
+                case TypeCode::Float    : return "f&";
+                case TypeCode::Double   : return "d&";
+                case TypeCode::Boolean  : return "?&";
+
+                case TypeCode::String   : return "s&";
+                case TypeCode::Object   : return "{" + _className + "}&";
+                case TypeCode::Array    : return "[" + _itemType->toSignature() + "]&";
+            }
         }
     }
 };
@@ -137,65 +174,69 @@ struct TypeSize;
 template <>
 struct TypeSize<sizeof(int8_t)>
 {
-    static Type   signedType(void) { return Type::TypeCode:: Int8; }
-    static Type unsignedType(void) { return Type::TypeCode::UInt8; }
+    static Type   signedType(bool isMutable) { return Type(Type::TypeCode:: Int8, isMutable); }
+    static Type unsignedType(bool isMutable) { return Type(Type::TypeCode::UInt8, isMutable); }
 };
 
 template <>
 struct TypeSize<sizeof(int16_t)>
 {
-    static Type   signedType(void) { return Type::TypeCode:: Int16; }
-    static Type unsignedType(void) { return Type::TypeCode::UInt16; }
+    static Type   signedType(bool isMutable) { return Type(Type::TypeCode:: Int16, isMutable); }
+    static Type unsignedType(bool isMutable) { return Type(Type::TypeCode::UInt16, isMutable); }
 };
 
 template <>
 struct TypeSize<sizeof(int32_t)>
 {
-    static Type   signedType(void) { return Type::TypeCode:: Int32; }
-    static Type unsignedType(void) { return Type::TypeCode::UInt32; }
+    static Type   signedType(bool isMutable) { return Type(Type::TypeCode:: Int32, isMutable); }
+    static Type unsignedType(bool isMutable) { return Type(Type::TypeCode::UInt32, isMutable); }
 };
 
 template <>
 struct TypeSize<sizeof(int64_t)>
 {
-    static Type   signedType(void) { return Type::TypeCode:: Int64; }
-    static Type unsignedType(void) { return Type::TypeCode::UInt64; }
+    static Type   signedType(bool isMutable) { return Type(Type::TypeCode:: Int64, isMutable); }
+    static Type unsignedType(bool isMutable) { return Type(Type::TypeCode::UInt64, isMutable); }
 };
 
 template <bool isSigned, bool isUnsigned, bool isStructLike, typename Item>
 struct TypeHelper
 {
-    /* types that not recognized */
-    static_assert(isSigned || isUnsigned || isStructLike, "Cannot serialize or deserialize arbitrary type");
+    static Type type(bool isMutable)
+    {
+        /* types that not recognized */
+        static_assert(isSigned || isUnsigned || isStructLike, "Cannot serialize or deserialize arbitrary type");
+        abort();
+    }
 };
 
 template <typename Item>
 struct TypeHelper<true, false, false, Item>
 {
-    static Type type(void)
+    static Type type(bool isMutable)
     {
         /* signed integers */
-        return TypeSize<sizeof(Item)>::signedType();
+        return TypeSize<sizeof(Item)>::signedType(isMutable);
     }
 };
 
 template <typename Item>
 struct TypeHelper<false, true, false, Item>
 {
-    static Type type(void)
+    static Type type(bool isMutable)
     {
         /* unsigned integers */
-        return TypeSize<sizeof(Item)>::unsignedType();
+        return TypeSize<sizeof(Item)>::unsignedType(isMutable);
     }
 };
 
 template <typename Item>
 struct TypeHelper<false, false, true, Item>
 {
-    static Type type(void)
+    static Type type(bool isMutable)
     {
         /* structure types */
-        return Type(Type::TypeCode::Object, typeid(Item).name());
+        return Type(Type::TypeCode::Object, typeid(Item).name(), isMutable);
     }
 };
 
@@ -204,36 +245,43 @@ struct TypeItem
 {
     static Type type(void)
     {
+        /* doesn't support R-Value references */
+        static_assert(!std::is_rvalue_reference<Item>::value, "R-Value references are not supported");
+
         /* invoke type helper for detailed type information */
         return TypeHelper<
-            std::is_signed<Item>::value,
-            std::is_unsigned<Item>::value,
-            std::is_convertible<Item *, Serializable *>::value,
+            std::is_signed<std::decay_t<Item>>::value,
+            std::is_unsigned<std::decay_t<Item>>::value,
+            std::is_convertible<std::decay_t<Item> *, Serializable *>::value,
             Item
-        >::type();
+        >::type(!std::is_const<Item>::value && std::is_lvalue_reference<Item>::value);
     }
 };
 
-/* arrays */
-template <typename Item>
-struct TypeItem<std::vector<Item>>
-{
-    static Type type(void)
-    {
-        /* recursive to arrau item type */
-        return Type(Type::TypeCode::Array, TypeItem<Item>::type());
-    }
-};
+/* single precision floating point number */
+template <> struct TypeItem<      float  > { static Type type(void) { return Type(Type::TypeCode::Float, false); } };
+template <> struct TypeItem<      float &> { static Type type(void) { return Type(Type::TypeCode::Float, true ); } };
+template <> struct TypeItem<const float &> { static Type type(void) { return Type(Type::TypeCode::Float, false); } };
 
-/* floating point numbers */
-template <> struct TypeItem<float > { static Type type(void) { return Type::TypeCode::Float; } };
-template <> struct TypeItem<double> { static Type type(void) { return Type::TypeCode::Double; } };
+/* double precision floating point number */
+template <> struct TypeItem<      double  > { static Type type(void) { return Type(Type::TypeCode::Double, false); } };
+template <> struct TypeItem<      double &> { static Type type(void) { return Type(Type::TypeCode::Double, true ); } };
+template <> struct TypeItem<const double &> { static Type type(void) { return Type(Type::TypeCode::Double, false); } };
 
 /* boolean */
-template <> struct TypeItem<bool> { static Type type(void) { return Type::TypeCode::Boolean; } };
+template <> struct TypeItem<      bool  > { static Type type(void) { return Type(Type::TypeCode::Boolean, false); } };
+template <> struct TypeItem<      bool &> { static Type type(void) { return Type(Type::TypeCode::Boolean, true ); } };
+template <> struct TypeItem<const bool &> { static Type type(void) { return Type(Type::TypeCode::Boolean, false); } };
 
 /* STL string */
-template <> struct TypeItem<std::string> { static Type type(void) { return Type::TypeCode::String; } };
+template <> struct TypeItem<      std::string  > { static Type type(void) { return Type(Type::TypeCode::String, false); } };
+template <> struct TypeItem<      std::string &> { static Type type(void) { return Type(Type::TypeCode::String, true ); } };
+template <> struct TypeItem<const std::string &> { static Type type(void) { return Type(Type::TypeCode::String, false); } };
+
+/* STL vector (arrays) */
+template <typename Item> struct TypeItem<      std::vector<Item>  > { static Type type(void) { return Type(Type::TypeCode::Array, TypeItem<Item>::type(), false); }};
+template <typename Item> struct TypeItem<      std::vector<Item> &> { static Type type(void) { return Type(Type::TypeCode::Array, TypeItem<Item>::type(), true ); }};
+template <typename Item> struct TypeItem<const std::vector<Item> &> { static Type type(void) { return Type(Type::TypeCode::Array, TypeItem<Item>::type(), false); }};
 
 /****** Type array resolvers ******/
 
@@ -301,14 +349,33 @@ struct Signature<R (T::*)(Args ...)>
 
 /****** Utilities ******/
 
-template <typename T>
-struct IsVector : public std::false_type {};
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCSimplifyInspection"
 
-template <typename T>
-struct IsVector<std::vector<T>> : public std::true_type
+template <typename T, typename Integer>
+struct IsSignedIntegerLike
 {
-    typedef T ItemType;
+    static const bool value =
+       !std::is_same    <std::decay_t<T>, bool>::value &&
+        std::is_signed  <std::decay_t<T>      >::value &&
+        std::is_integral<std::decay_t<T>      >::value &&
+       (sizeof(std::decay_t<T>) == sizeof(Integer));
 };
+
+template <typename T, typename Integer>
+struct IsUnsignedIntegerLike
+{
+    static const bool value =
+       !std::is_same    <std::decay_t<T>, bool>::value &&
+        std::is_unsigned<std::decay_t<T>      >::value &&
+        std::is_integral<std::decay_t<T>      >::value &&
+       (sizeof(std::decay_t<T>) == sizeof(Integer));
+};
+
+#pragma clang diagnostic pop
+
+template <typename T> struct IsVector: public std::false_type {};
+template <typename T> struct IsVector<std::vector<T>> : public std::true_type { typedef T ItemType; };
 }
 }
 

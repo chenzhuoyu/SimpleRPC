@@ -19,11 +19,11 @@ namespace Functional
 {
 namespace Implementation
 {
-template <typename T, typename Method, class ArgsTuple, size_t ... I>
-constexpr auto applyImpl(T *self, Method &&method, ArgsTuple &&args, std::index_sequence<I ...>)
+template <typename T, typename Method, class ArgsTuple, size_t ... Index>
+constexpr auto applyImpl(T *self, Method &&method, ArgsTuple &&args, std::index_sequence<Index ...>)
 {
     /* tuple expansion */
-    return (self->*method)(std::get<I>(std::forward<ArgsTuple>(args)) ...);
+    return (self->*method)(std::get<Index>(std::forward<ArgsTuple>(args)) ...);
 }
 }
 
