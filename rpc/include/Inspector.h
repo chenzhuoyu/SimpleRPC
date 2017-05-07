@@ -108,21 +108,23 @@ public:
 
 /****** Parameter tuple expanders ******/
 
-template <typename ... Args>
-struct ParamTuple;
+template <size_t I, typename ... Args>
+struct ParamTupleImpl;
 
-template <typename Item, typename ... Items>
-struct ParamTuple<Item, Items ...>
+template <size_t I, typename Item, typename ... Items>
+struct ParamTupleImpl<I, Item, Items ...>
 {
     static std::tuple<Item, Items ...> expand(Variant &array)
     {
-        size_t index = array.size() - sizeof ... (Items) - 1;
-        return std::tuple_cat(std::forward_as_tuple(array[index].get<Item>()), ParamTuple<Items ...>::expand(array));
+        return std::tuple_cat(
+            std::forward_as_tuple(array[I].get<Item>()),
+            ParamTupleImpl<I + 1, Items ...>::expand(array)
+        );
     }
 };
 
-template <>
-struct ParamTuple<>
+template <size_t I>
+struct ParamTupleImpl<I>
 {
     static std::tuple<> expand(Variant &)
     {
@@ -130,6 +132,9 @@ struct ParamTuple<>
         return std::tuple<>();
     }
 };
+
+template <typename ... Args>
+using ParamTuple = ParamTupleImpl<0, Args ...>;
 
 /****** Reflection registry descriptor ******/
 
@@ -159,8 +164,8 @@ public:
                 },
                 [=](const Field *field, void *self, const Variant &value)
                 {
-                    /* using the template to resolve types during compilation */
-                    field->data<FieldType>(self) = value.get<FieldType>();
+                    /* it's guaranteed that `Variant::get` would not modify the variant itself, so `const_cast` would be safe here */
+                    field->data<FieldType>(self) = const_cast<Variant &>(value).get<FieldType>();
                 }
             )) {}
 
