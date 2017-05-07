@@ -4,6 +4,10 @@ project(SimpleRPC)
 set(CMAKE_CXX_STANDARD 14)
 add_definitions(-D_BSD_SOURCE)
 
+if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
+    include_directories(/usr/local/include)
+endif()
+
 include_directories(
         ${CMAKE_SOURCE_DIR}/rpc/include
         ${CMAKE_SOURCE_DIR}/rpc/include/backend)
