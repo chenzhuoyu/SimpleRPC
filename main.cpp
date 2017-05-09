@@ -2,25 +2,22 @@
 #include "Backend.h"
 #include "SimpleRPC.h"
 
-struct Test final : public SimpleRPC::SerializableWrapper<Test>
+defineClass(Test,
+    defineField(int, n),
+    declareMethod(int, test, std::vector<int> &x, Test &y, int &z)
+);
+
+int Test::test(std::vector<int> &x, Test &y, int &z)
 {
-    int n;
-    int test(std::vector<int> &x, Test &y, int &z)
-    {
-        fprintf(stderr, "this is %p\n", this);
-        fprintf(stderr, "array is %s\n", SimpleRPC::Variant(x).toString().c_str());
-        for (auto &n : x)
-            n *= 10;
-        fprintf(stderr, "now array is %s\n", SimpleRPC::Variant(x).toString().c_str());
-        z = 555;
-        y.n = 666;
-        return 456123;
-    }
-};
-static SimpleRPC::Internal::Descriptor<Test> __register__ [[gnu::unused]] ({
-    SimpleRPC::Internal::Descriptor<Test>::MemberData("n", ((Test *)nullptr)->n),
-    SimpleRPC::Internal::Descriptor<Test>::MemberData("test", &Test::test),
-});
+    fprintf(stderr, "this is %p\n", this);
+    fprintf(stderr, "array is %s\n", SimpleRPC::Variant(x).toString().c_str());
+    for (auto &n : x)
+        n *= 10;
+    fprintf(stderr, "now array is %s\n", SimpleRPC::Variant(x).toString().c_str());
+    z = 555;
+    y.n = 666;
+    return 456123;
+}
 
 int main()
 {
