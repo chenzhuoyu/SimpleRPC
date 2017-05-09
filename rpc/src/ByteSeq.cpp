@@ -33,15 +33,6 @@ char *ByteSeq::consume(size_t size)
     if (size > _length)
         throw Exceptions::BufferOverflowError(_length);
 
-    /* byte-reading boundary limitation */
-    if (!_boundary.empty())
-    {
-        if (size <= _boundary.top())
-            _boundary.top() -= size;
-        else
-            throw Exceptions::BufferOverflowError(_boundary.top());
-    }
-
     /* simply move read pointer */
     _length -= size;
     _readptr += size;

@@ -25,9 +25,6 @@ private:
     size_t _capacity = 0;
 
 private:
-    std::stack<size_t> _boundary;
-
-private:
     static constexpr inline size_t alignUp(size_t value)
     {
         /* aligh up with 256 */
@@ -77,19 +74,6 @@ public:
     void append(const char *data)        { append(data, strlen(data)); }
     void append(const ByteSeq &data)     { append(data.data(), data.length()); }
     void append(const std::string &data) { append(data.data(), data.length()); }
-
-public:
-    size_t boundary(void) const
-    {
-        if (_boundary.empty())
-            return _length;
-        else
-            return _boundary.top();
-    }
-
-public:
-    void popBoundary(void)              { _boundary.pop(); }
-    void pushBoundary(size_t boundary)  { _boundary.push(boundary); }
 
 public:
     template <typename T>
