@@ -7,6 +7,7 @@
 #include <memory>
 #include <algorithm>
 
+#include "Registry.h"
 #include "Exceptions.h"
 #include "Functional.h"
 
@@ -240,6 +241,9 @@ struct TypeHelper<false, false, true, Item>
     }
 };
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCSimplifyInspection"
+
 template <typename Item>
 struct TypeItem
 {
@@ -254,9 +258,14 @@ struct TypeItem
             std::is_unsigned<std::decay_t<Item>>::value,
             std::is_convertible<std::decay_t<Item> *, Serializable *>::value,
             Item
-        >::type(!std::is_const<Item>::value && std::is_lvalue_reference<Item>::value);
+        >::type(
+            std::is_lvalue_reference<Item>::value &&
+           !std::is_const<std::remove_reference<Item>>::value
+        );
     }
 };
+
+#pragma clang diagnostic pop
 
 /* single precision floating point number */
 template <> struct TypeItem<      float  > { static Type type(void) { return Type(Type::TypeCode::Float, false); } };
@@ -352,6 +361,18 @@ struct Signature<R (T::*)(Args ...)>
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCSimplifyInspection"
 
+template <typename T> struct IsVector                 : public std::false_type {};
+template <typename T> struct IsVector<std::vector<T>> : public std::true_type  { typedef T ItemType; };
+
+template <typename T>
+struct IsObjectReference
+{
+    static const bool value =
+        std::is_lvalue_reference<T>::value &&
+       !std::is_const<std::remove_reference_t<T>>::value &&
+        std::is_convertible<std::decay_t<T> *, Serializable *>::value;
+};
+
 template <typename T, typename Integer>
 struct IsSignedIntegerLike
 {
@@ -359,7 +380,7 @@ struct IsSignedIntegerLike
        !std::is_same    <std::decay_t<T>, bool>::value &&
         std::is_signed  <std::decay_t<T>      >::value &&
         std::is_integral<std::decay_t<T>      >::value &&
-       (sizeof(std::decay_t<T>) == sizeof(Integer));
+        (sizeof(std::decay_t<T>) == sizeof(Integer));
 };
 
 template <typename T, typename Integer>
@@ -369,13 +390,10 @@ struct IsUnsignedIntegerLike
        !std::is_same    <std::decay_t<T>, bool>::value &&
         std::is_unsigned<std::decay_t<T>      >::value &&
         std::is_integral<std::decay_t<T>      >::value &&
-       (sizeof(std::decay_t<T>) == sizeof(Integer));
+        (sizeof(std::decay_t<T>) == sizeof(Integer));
 };
 
 #pragma clang diagnostic pop
-
-template <typename T> struct IsVector: public std::false_type {};
-template <typename T> struct IsVector<std::vector<T>> : public std::true_type { typedef T ItemType; };
 }
 }
 

@@ -300,34 +300,47 @@ public:
             throw Exceptions::TypeError(toString() + " is not a string");
     }
 
-// TODO: universal getter for arrays and objects
+/** Wrapped objects (arrays and objects) **/
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<IsTypeWrapper<T>::value, Tag> = Tag())
+    {
+        /* let compiler decide which "override" should be used */
+        return std::decay_t<T>(getWrapped<typename T::Type>());
+    }
 
 private:
     template <typename T>
-    inline std::enable_if_t<IsVector<T>::value, void> getValue(T &v) const
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<IsVector<T>::value, Tag> = Tag())
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
 
-        typedef typename IsVector<T>::ItemType ItemType;
-        std::vector<ItemType> *array = static_cast<std::vector<ItemType> *>(&v);
+        /* create result array */
+        std::shared_ptr<T> array(new T);
 
+        /* fill each item */
         for (const auto &item : _array)
-            array->push_back(item->get<ItemType>());
+            array->push_back(item->get<typename IsVector<T>::ItemType>());
+
+        return std::move(array);
     }
 
 private:
     template <typename T>
-    inline std::enable_if_t<std::is_convertible<T *, Serializable *>::value, void> getValue(T &v) const
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag())
     {
-        /* it's ensured to be convertible to `Serializable` as `std:enable_if_t<...>` says */
-        if (_type == Type::TypeCode::Object)
-            v.deserialize(*this);
-        else
+        if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
-    }
 
-// END-TODO
+        /* create result object */
+        std::shared_ptr<T> object(new T);
+
+        /* deserialize from self */
+        object->deserialize(*this);
+        return std::move(object);
+    }
 
 public:
     size_t size(void) const

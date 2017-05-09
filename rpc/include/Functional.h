@@ -8,8 +8,7 @@
 #include <functional>
 #include <type_traits>
 
-#pragma ide diagnostic push
-#pragma ide diagnostic ignored "Simplifiable statement"
+#include "TypeWrapper.h"
 
 namespace SimpleRPC
 {
@@ -19,15 +18,32 @@ namespace Functional
 {
 namespace Implementation
 {
-template <typename T, typename Method, class ArgsTuple, size_t ... Index>
-constexpr auto applyImpl(T *self, Method &&method, ArgsTuple &&args, std::index_sequence<Index ...>)
+template <typename T>
+struct Expander
 {
-    /* tuple expansion */
-    return (self->*method)(std::get<Index>(std::forward<ArgsTuple>(args)) ...);
-}
+    typedef T Type;
+    static constexpr T &expand(T &&value) { return value; }
+};
+
+template <typename T>
+struct Expander<TypeWrapper<T> &>
+{
+    typedef T Type;
+    static constexpr T &expand(TypeWrapper<T> &value) { return *value; }
+};
+
+template <typename T>
+constexpr typename Expander<T>::Type &expand(T &&value)
+{
+    return Expander<T>::expand(std::forward<T>(value));
 }
 
-/** compile-time maximum **/
+template <typename T, typename F, class ArgsTuple, size_t ... Index>
+constexpr auto invokeMethodByTuple(T *self, F &&f, ArgsTuple &&args, std::index_sequence<Index ...>)
+{
+    return (self->*f)(expand(std::get<Index>(std::forward<ArgsTuple>(args))) ...);
+}
+}
 
 template <typename T>
 constexpr T &&max(T &&a, T &&b)
@@ -41,23 +57,18 @@ constexpr T &&max(T &&a, Args && ... args)
     return max(std::forward<T>(a), max(std::forward<Args>(args) ...));
 }
 
-/** self-implemented and simplified version of `std::apply()` (since C++/17) **/
-
 template <typename T, typename F, typename Tuple>
-constexpr auto apply(T *self, F &&f, Tuple &&t)
+constexpr auto invokeMethod(T *self, F &&f, Tuple &&args)
 {
-    /* build an index sequence for tuple expansion */
-    return Implementation::applyImpl(
+    return Implementation::invokeMethodByTuple(
         self,
         std::forward<F>(f),
-        std::forward<Tuple>(t),
+        std::forward<Tuple>(args),
         std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>()
     );
 }
 }
 }
 }
-
-#pragma ide diagnostic pop
 
 #endif /* SIMPLERPC_FUNCTIONAL_H */

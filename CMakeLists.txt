@@ -26,7 +26,7 @@ set(SIMPLE_RPC
         rpc/src/backend/Backend.cpp
         rpc/src/backend/MessagePackBackend.cpp
         rpc/src/ByteSeq.cpp
-        rpc/src/Registry.cpp)
+        rpc/src/Registry.cpp rpc/include/TypeWrapper.h)
 
 add_executable(SimpleRPC ${SIMPLE_RPC} main.cpp)
 target_link_libraries(SimpleRPC)

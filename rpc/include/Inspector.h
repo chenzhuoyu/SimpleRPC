@@ -21,6 +21,7 @@
 #include "Registry.h"
 #include "Exceptions.h"
 #include "Functional.h"
+#include "TypeWrapper.h"
 
 namespace SimpleRPC
 {
@@ -106,6 +107,18 @@ public:
 
 };
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCSimplifyInspection"
+
+/****** Parameter type reference ******/
+
+template <typename T>
+struct TypeRef
+{
+    typedef std::decay_t<T> U;
+    typedef std::conditional_t<IsVector<U>::value || std::is_convertible<U *, Serializable *>::value, TypeWrapper<U>, T> Type;
+};
+
 /****** Parameter tuple expanders ******/
 
 template <size_t I, typename ... Args>
@@ -117,7 +130,7 @@ struct ParamTupleImpl<I, Item, Items ...>
     static std::tuple<Item, Items ...> expand(Variant &array)
     {
         return std::tuple_cat(
-            std::forward_as_tuple(array[I].get<Item>()),
+            std::forward_as_tuple(array[I].template get<Item>()),
             ParamTupleImpl<I + 1, Items ...>::expand(array)
         );
     }
@@ -134,7 +147,79 @@ struct ParamTupleImpl<I>
 };
 
 template <typename ... Args>
-using ParamTuple = ParamTupleImpl<0, Args ...>;
+using ParamTuple = ParamTupleImpl<0, typename TypeRef<Args>::Type ...>;
+
+/****** Mutable parameter back-patcher ******/
+
+template <size_t I, typename T, typename U, bool IsObject>
+struct ObjectPatcher
+{
+    static void patch(Variant &array, U &item)
+    {
+        /* read-only argument, no need to patch */
+        /* thus do nothing */
+    }
+};
+
+template <size_t I, typename T, typename U>
+struct ObjectPatcher<I, T, U, true>
+{
+    static void patch(Variant &array, U &item)
+    {
+        /* for object, re-serialize to `Variant` */
+        array[I] = (*item).serialize();
+    }
+};
+
+template <size_t I, typename T>
+struct ItemPatcher
+{
+    template <typename U>
+    static void patch(Variant &array, U &item)
+    {
+        /* delegate to object patcher to get around the template problem */
+        ObjectPatcher<I, T, U, IsObjectReference<T>::value>::patch(array, item);
+    }
+};
+
+template <size_t I, typename T>
+struct ItemPatcher<I, std::vector<T> &>
+{
+    template <typename U>
+    static void patch(Variant &array, U &item)
+    {
+        /* for array, simply assign back */
+        array[I] = std::move(*item);
+    }
+};
+
+template <size_t I, typename Tuple, typename ... Args>
+struct BackPatcherImpl;
+
+template <size_t I, typename Tuple, typename Item, typename ... Items>
+struct BackPatcherImpl<I, Tuple, Item, Items ...>
+{
+    static void patch(Variant &array, Tuple &&tuple)
+    {
+        ItemPatcher<I, Item>::template patch(array, std::get<I>(tuple));
+        BackPatcherImpl<I + 1, Tuple, Items ...>::patch(array, std::move(tuple));
+    }
+};
+
+template <size_t I, typename Tuple>
+struct BackPatcherImpl<I, Tuple>
+{
+    static void patch(Variant &, Tuple &&)
+    {
+        /* final recursion, no arguments left */
+        /* thus nothing to do */
+    }
+};
+
+template <typename Tuple, typename ... Args>
+using BackPatcher = BackPatcherImpl<0, Tuple, Args ...>;
+
+#pragma clang diagnostic pop
 
 /****** Reflection registry descriptor ******/
 
@@ -179,11 +264,21 @@ public:
                 Signature<Result (T::*)(Args ...)>::resolve(),
                 [=](Serializable *self, Variant &argv)
                 {
-                    /* check for parameter count and invoke target method with parameter array */
-                    if (argv.size() != sizeof ... (Args))
+                    /* check for parameters and invoke target method with parameter array */
+                    if (argv.type() != Type::TypeCode::Array)
+                        throw Exceptions::TypeError("Parameter pack must be an array");
+                    else if (argv.size() != sizeof ... (Args))
                         throw Exceptions::ArgumentError(sizeof ... (Args), argv.size());
-                    else
-                        return Variant(Functional::apply(static_cast<T *>(self), method, ParamTuple<Args ...>::expand(argv)));
+
+                    /* build arguments tuple and invoke target method */
+                    auto tuple = ParamTuple<Args ...>::expand(argv);
+                    auto result = Functional::invokeMethod(static_cast<T *>(self), method, tuple);
+
+                    /* patch mutable arguments back into `argv` */
+                    BackPatcher<decltype(tuple), Args ...>::patch(argv, std::move(tuple));
+
+                    /* convert to variant */
+                    return Variant(result);
                 }
             )) {}
     };
