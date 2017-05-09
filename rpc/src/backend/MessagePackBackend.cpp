@@ -318,7 +318,7 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
 
         case Internal::Type::TypeCode::Array:
         {
-            if (object.internalArray().size() < 15)
+            if (object.internalArray().size() <= 15)
             {
                 /* fixarray */
                 result.appendBE(static_cast<uint8_t>(0x90 | object.internalArray().size()));
@@ -350,20 +350,20 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
 
         case Internal::Type::TypeCode::Object:
         {
-            if (object.internalObject().size() < 15)
+            if (object.internalObject().size() <= 15)
             {
-                /* fixarray */
+                /* fixmap */
                 result.appendBE(static_cast<uint8_t>(0x80 | object.internalObject().size()));
             }
             else if (object.internalObject().size() <= UINT16_MAX)
             {
-                /* array16 */
+                /* map16 */
                 result.appendBE((uint8_t)0xde);
                 result.appendBE(static_cast<uint16_t>(object.internalObject().size()));
             }
             else if (object.internalObject().size() <= UINT32_MAX)
             {
-                /* array32 */
+                /* map32 */
                 result.appendBE((uint8_t)0xdf);
                 result.appendBE(static_cast<uint32_t>(object.internalObject().size()));
             }
