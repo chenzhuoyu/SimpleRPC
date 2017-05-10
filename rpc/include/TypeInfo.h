@@ -249,7 +249,8 @@ struct TypeItem
 {
     static Type type(void)
     {
-        /* doesn't support R-Value references */
+        /* doesn't support pointers or R-Value references */
+        static_assert(!std::is_pointer<Item>::value, "Pointers are not supported");
         static_assert(!std::is_rvalue_reference<Item>::value, "R-Value references are not supported");
 
         /* invoke type helper for detailed type information */

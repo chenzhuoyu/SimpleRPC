@@ -41,17 +41,17 @@ void Serializable::deserialize(const Variant &value)
     if (value.type() != Type::TypeCode::Object)
         throw Exceptions::TypeError(value.toString() + " is not an object");
 
-    auto keys = value.keys();
-    auto fields = _meta.fields();
+    const auto &fields = _meta.fields();
+    const auto &object = value.internalObject();
 
-    for (const auto &field : keys)
-        if (fields.find(field) == fields.end())
-            throw Exceptions::ReflectionError("No such field \"" + field + "\"");
+    for (const auto &field : object)
+        if (fields.find(field.first) == fields.end())
+            throw Exceptions::ReflectionError("No such field \"" + field.first + "\"");
 
     for (const auto &field : fields)
     {
-        if (std::find(keys.begin(), keys.end(), field.first) != keys.end())
-            field.second->deserialize(this, value[field.first]);
+        if (object.find(field.first) != object.end())
+            field.second->deserialize(this, *object.at(field.first));
         else
             throw Exceptions::ReflectionError("Missing field \"" + field.first + "\"");
     }

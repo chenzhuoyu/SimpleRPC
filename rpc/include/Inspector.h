@@ -252,7 +252,11 @@ public:
                     /* it's guaranteed that `Variant::get` would not modify the variant itself, so `const_cast` would be safe here */
                     field->data<FieldType>(self) = const_cast<Variant &>(value).get<FieldType>();
                 }
-            )) {}
+            ))
+        {
+            /* reference field types are not supported */
+            static_assert(!std::is_reference<FieldType>::value, "Reference field types are not supported");
+        }
 
     public:
         template <typename Result, typename ... Args>
@@ -280,7 +284,11 @@ public:
                     /* convert to variant */
                     return Variant(result);
                 }
-            )) {}
+            ))
+        {
+            /* reference return types are not supported */
+            static_assert(!std::is_reference<Result>::value, "Reference return types are not supported");
+        }
     };
 
 public:

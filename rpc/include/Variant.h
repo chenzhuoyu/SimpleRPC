@@ -352,17 +352,6 @@ public:
     }
 
 public:
-    std::vector<std::string> keys(void) const
-    {
-        if (_type != Type::TypeCode::Object)
-            throw Exceptions::TypeError(toString() + " is not an object");
-
-        std::vector<std::string> result(_object.size());
-        std::transform(_object.begin(), _object.end(), result.begin(), [](auto x){ return x.first; });
-        return result;
-    }
-
-public:
     Variant &operator[](ssize_t index)
     {
         if (_type != Type::TypeCode::Array)
