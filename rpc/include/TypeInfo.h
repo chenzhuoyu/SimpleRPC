@@ -176,9 +176,6 @@ public:
 
 /****** Type resolvers ******/
 
-/* forward declaration of class Serializable */
-class Serializable;
-
 /* type size container */
 template <size_t size>
 struct TypeSize;
