@@ -26,6 +26,9 @@ class Type final
 public:
     enum class TypeCode : int
     {
+        /* void */
+        Void,
+
         /* signed integers */
         Int8,
         Int16,
@@ -55,6 +58,10 @@ public:
 
 private:
     TypeCode _typeCode;
+
+public:
+    /* default void type */
+    explicit Type() : _typeCode(TypeCode::Void), _isMutable(false) {}
 
 public:
     /* primitive types */
@@ -132,6 +139,7 @@ public:
                 case TypeCode::Double   : return "d";
                 case TypeCode::Boolean  : return "?";
 
+                case TypeCode::Void     : return "v";
                 case TypeCode::String   : return "s";
                 case TypeCode::Object   : return "{" + _className + "}";
                 case TypeCode::Array    : return "[" + _itemType->toSignature() + "]";
@@ -158,6 +166,9 @@ public:
                 case TypeCode::String   : return "s&";
                 case TypeCode::Object   : return "{" + _className + "}&";
                 case TypeCode::Array    : return "[" + _itemType->toSignature() + "]&";
+
+                case TypeCode::Void:
+                    throw std::range_error("`void` should always be immutable");
             }
         }
     }
@@ -268,6 +279,9 @@ struct TypeItem
 
 #pragma clang diagnostic pop
 
+/* void type */
+template <> struct TypeItem<void> { static Type type(void) { return Type(); } };
+
 /* single precision floating point number */
 template <> struct TypeItem<      float  > { static Type type(void) { return Type(Type::TypeCode::Float, false); } };
 template <> struct TypeItem<      float &> { static Type type(void) { return Type(Type::TypeCode::Float, true ); } };
@@ -301,59 +315,57 @@ struct TypeArray;
 template <typename Item, typename ... Items>
 struct TypeArray<Item, Items ...>
 {
-    static std::vector<Type> type(void)
+    static void resolve(std::vector<Type> &types)
     {
-        auto first = std::move(TypeItem<Item>::type());
-        auto remains = std::move(TypeArray<Items ...>::type());
-
-        remains.insert(remains.begin(), first);
-        return remains;
+        types.push_back(TypeItem<Item>::type());
+        TypeArray<Items ...>::resolve(types);
     }
 };
 
 template <>
 struct TypeArray<>
 {
-    static std::vector<Type> type(void)
+    static void resolve(std::vector<Type> &)
     {
         /* final recursion, no arguments left */
-        return std::vector<Type>();
+        /* thus nothing to do */
     }
 };
 
-/****** Signature generators ******/
+/****** Method signature resolvers ******/
 
-template <typename T>
-struct Signature
+template <typename ... Args>
+struct MetaArgs
 {
-    static std::string resolve(void)
+    static std::vector<Type> type(void)
     {
-        /* simple type, just resolve by `Type` */
-        return TypeItem<T>::type().toSignature();
+        std::vector<Type> types;
+        types.reserve(sizeof ... (Args));
+        TypeArray<Args ...>::resolve(types);
+        return std::move(types);
     }
 };
 
-template <typename T>
-struct Signature<std::vector<T>>
+template <typename R, typename ... Args>
+struct MetaMethod
 {
-    static std::string resolve(void)
-    {
-        /* arrays, resolve recursively  */
-        return "[" + Signature<T>::resolve() + "]";
-    }
-};
+    Type result;
+    std::string name;
+    std::string signature;
+    std::vector<Type> args;
 
-template <typename R, typename T, typename ... Args>
-struct Signature<R (T::*)(Args ...)>
-{
-    static std::string resolve(void)
+public:
+    explicit MetaMethod(const char *name) :
+        name(name), args(MetaArgs<Args ...>::type()), result(TypeItem<R>::type())
     {
-        /* method signature should be treated seperately */
-        std::string result = "(";
-        std::vector<Type> &&types = TypeArray<Args ...>::type();
+        signature = name;
+        signature += "(";
 
-        std::for_each(types.begin(), types.end(), [&](auto x){ result += x.toSignature(); });
-        return result + ")" + TypeItem<R>::type().toSignature();
+        for (const auto type : args)
+            signature += type.toSignature();
+
+        signature += ")";
+        signature += TypeItem<R>::type().toSignature();
     }
 };
 

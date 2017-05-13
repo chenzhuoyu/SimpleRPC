@@ -73,6 +73,9 @@ public:
     explicit Variant(const Type::TypeCode &type) : _type(type) {}
 
 public:
+    Variant() : _type(Type::TypeCode::Void) {}
+
+public:
     Variant(int8_t  value) : _type(Type::TypeCode::Int8 ), _s8 (value) {}
     Variant(int16_t value) : _type(Type::TypeCode::Int16), _s16(value) {}
     Variant(int32_t value) : _type(Type::TypeCode::Int32), _s32(value) {}
@@ -304,10 +307,10 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<IsTypeWrapper<T>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<IsTypeWrapper<T>::value, Tag> = Tag())
     {
-        /* let compiler decide which "override" should be used */
-        return std::decay_t<T>(getWrapped<typename T::Type>());
+        /* let the compiler decide which override should be used */
+        return T(getWrapped<typename T::Type>());
     }
 
 private:
@@ -476,6 +479,9 @@ public:
     {
         switch (_type)
         {
+            /* void type */
+            case Type::TypeCode::Void       : return "void";
+
             /* signed integers */
             case Type::TypeCode::Int8       : return "int8_t("  + std::to_string(_s8 ) + ")";
             case Type::TypeCode::Int16      : return "int16_t(" + std::to_string(_s16) + ")";

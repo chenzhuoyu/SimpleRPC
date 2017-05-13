@@ -4,19 +4,18 @@
 
 defineClass(Test,
     defineField(int, n),
-    declareMethod(int, test, std::vector<int> &x, Test &y, int &z)
+    declareMethod(void, test, std::vector<int> &x, Test &y, const std::string &z, int w)
 );
 
-int Test::test(std::vector<int> &x, Test &y, int &z)
+void Test::test(std::vector<int> &x, Test &y, const std::string &z, int w)
 {
     fprintf(stderr, "this is %p\n", this);
+    fprintf(stderr, "w is %d\n", w);
     fprintf(stderr, "array is %s\n", SimpleRPC::Variant(x).toString().c_str());
     for (auto &n : x)
         n *= 10;
     fprintf(stderr, "now array is %s\n", SimpleRPC::Variant(x).toString().c_str());
-    z = 555;
     y.n = 666;
-    return 456123;
 }
 
 int main()
@@ -26,15 +25,15 @@ int main()
     std::shared_ptr<Test> test(meta.newInstance<Test>());
 
     /* method lookup, the method name is it's signature */
-    const std::shared_ptr<SimpleRPC::Method> &method1 = meta.methods().at("test([i]&{4Test}&i&)i");
+    const std::shared_ptr<SimpleRPC::Method> &method = meta.methods().at("test([i]&{4Test}&si)v");
 
     /* print method's name signature */
-    fprintf(stderr, "%s::%s\n", meta.name().c_str(), method1->name().c_str());
+    fprintf(stderr, "%s::%s\n", meta.name().c_str(), method->name().c_str());
 
     /* invoke method using reflection */
-    SimpleRPC::Variant args = { {1, 2, 3}, SimpleRPC::Variant::object({{ "n", 123 }}), 999 };
+    SimpleRPC::Variant args = { {1, 2, 3}, SimpleRPC::Variant::object({{ "n", 123 }}), "asd", 555 };
     fprintf(stderr, "args-before: %s\n", args.toString().c_str());
-    fprintf(stderr, "result: %s\n", method1->invoke(test.get(), args).toString().c_str());
+    fprintf(stderr, "result: %s\n", method->invoke(test.get(), args).toString().c_str());
     fprintf(stderr, "args-after: %s\n", args.toString().c_str());
     return 0;
 }

@@ -22,7 +22,7 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
 
         /* nil */
         case 0xc0:
-            throw Exceptions::DeserializerError("\"Nil\" not supported");
+            return Variant();
 
         /* (never used) */
         case 0xc1:
@@ -186,6 +186,13 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
 
     switch (object.type())
     {
+        case Internal::Type::TypeCode::Void:
+        {
+            /* `void` is serialized as `Nil` */
+            result.appendBE((uint8_t)0xc0);
+            break;
+        }
+
         case Internal::Type::TypeCode::Int8:
         {
             /* convert to `int8_t` */

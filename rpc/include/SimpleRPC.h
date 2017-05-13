@@ -20,7 +20,7 @@ template <typename T>
 struct SerializableWrapper : public Serializable
 {
     explicit SerializableWrapper() :
-        Serializable(Registry::findClass(Internal::Signature<T>::resolve())) {}
+        Serializable(Registry::findClass(Internal::TypeItem<T>::type().toSignature())) {}
 };
 }
 

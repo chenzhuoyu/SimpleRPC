@@ -80,6 +80,7 @@ class Method
 {
     Type _result;
     std::string _name;
+    std::string _signature;
 
 private:
     Method(const Method &) = delete;
@@ -93,13 +94,21 @@ private:
     std::vector<Type> _args;
 
 public:
-    explicit Method(const char *name, Type &&result, std::vector<Type> &&args, std::string &&signature, Proxy &&proxy) :
-        _args(std::move(args)), _name(name + signature), _proxy(std::move(proxy)), _result(std::move(result)) {}
+    template <typename R, typename ... Args>
+    explicit Method(MetaMethod<R, Args ...> &&method, Proxy &&proxy) :
+        _args       (std::move(method.args)),
+        _name       (std::move(method.name)),
+        _result     (std::move(method.result)),
+        _signature  (std::move(method.signature)),
+        _proxy      (std::move(proxy)) {}
 
 public:
     const Type &result(void) const { return _result; }
-    const std::string &name(void) const { return _name; }
     const std::vector<Type> &args(void) const { return _args; }
+
+public:
+    const std::string &name(void) const { return _name; }
+    const std::string &signature(void) const { return _signature; }
 
 public:
     Variant invoke(Serializable *self, Variant &args) const { return _proxy(self, args); }
@@ -242,12 +251,12 @@ public:
                 name,
                 TypeItem<FieldType>::type(),
                 reinterpret_cast<uintptr_t>(&reference),
-                [=](const Field *field, const void *self)
+                [](const Field *field, const void *self)
                 {
                     /* using the template to resolve types during compilation */
                     return Variant(field->data<FieldType>(self));
                 },
-                [=](const Field *field, void *self, const Variant &value)
+                [](const Field *field, void *self, const Variant &value)
                 {
                     /* it's guaranteed that `Variant::get` would not modify the variant itself, so `const_cast` would be safe here */
                     field->data<FieldType>(self) = const_cast<Variant &>(value).get<FieldType>();
@@ -262,27 +271,25 @@ public:
         template <typename Result, typename ... Args>
         explicit MemberData(const char *name, Result (T::*&&method)(Args ...)) :
             isMethod(true), method(new Method(
-                name,
-                TypeItem<Result>::type(),
-                TypeArray<Args ...>::type(),
-                Signature<Result (T::*)(Args ...)>::resolve(),
-                [=](Serializable *self, Variant &argv)
+                MetaMethod<Result, Args ...>(name),
+                [=](Serializable *self, Variant &argv) mutable
                 {
-                    /* check for parameters and invoke target method with parameter array */
+                    /* wrapped argument types tuple */
+                    typedef std::tuple<typename TypeRef<Args>::Type ...> Tuple;
+
+                    /* check for parameters */
                     if (argv.type() != Type::TypeCode::Array)
                         throw Exceptions::TypeError("Parameter pack must be an array");
                     else if (argv.size() != sizeof ... (Args))
                         throw Exceptions::ArgumentError(sizeof ... (Args), argv.size());
 
-                    /* build arguments tuple and invoke target method */
+                    /* build arguments tuple and invoke target method through meta function wrapper */
                     auto tuple = ParamTuple<Args ...>::expand(argv);
-                    auto result = Functional::invokeMethod(static_cast<T *>(self), method, tuple);
+                    auto result = Functional::MetaFunction<Variant, Result, T, Tuple, Args ...>::invoke(static_cast<T *>(self), std::move(method), tuple);
 
                     /* patch mutable arguments back into `argv` */
-                    BackPatcher<decltype(tuple), Args ...>::patch(argv, std::move(tuple));
-
-                    /* convert to variant */
-                    return Variant(result);
+                    BackPatcher<Tuple, Args ...>::patch(argv, std::move(tuple));
+                    return std::move(result);
                 }
             ))
         {
@@ -302,11 +309,11 @@ public:
             if (!info.isMethod)
                 fields.insert({ info.field->name(), std::move(info.field) });
             else
-                methods.insert({ info.method->name(), std::move(info.method) });
+                methods.insert({ info.method->signature(), std::move(info.method) });
         }
 
         Registry::addClass(std::make_shared<Registry::Meta>(
-            Signature<T>::resolve(),
+            TypeItem<T>::type().toSignature(),
             std::move(fields),
             std::move(methods),
             []{ return static_cast<Serializable *>(new T); }

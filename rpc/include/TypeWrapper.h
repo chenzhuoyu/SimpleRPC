@@ -26,10 +26,8 @@ public:
 
 };
 
-template <typename T> struct IsTypeWrapper                         : public std::false_type {};
-template <typename T> struct IsTypeWrapper<      TypeWrapper<T>  > : public std::true_type  {};
-template <typename T> struct IsTypeWrapper<      TypeWrapper<T> &> : public std::true_type  {};
-template <typename T> struct IsTypeWrapper<const TypeWrapper<T> &> : public std::true_type  {};
+template <typename T> struct IsTypeWrapper: public std::false_type {};
+template <typename T> struct IsTypeWrapper<TypeWrapper<T>> : public std::true_type {};
 }
 }
 

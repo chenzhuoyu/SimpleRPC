@@ -39,7 +39,7 @@ constexpr typename Expander<T>::Type &expand(T &&value)
 }
 
 template <typename T, typename F, class ArgsTuple, size_t ... Index>
-constexpr auto invokeMethodByTuple(T *self, F &&f, ArgsTuple &&args, std::index_sequence<Index ...>)
+constexpr auto invokeByTuple(T *self, F &&f, ArgsTuple &&args, std::index_sequence<Index ...>)
 {
     return (self->*f)(expand(std::get<Index>(std::forward<ArgsTuple>(args))) ...);
 }
@@ -57,16 +57,26 @@ constexpr T &&max(T &&a, Args && ... args)
     return max(std::forward<T>(a), max(std::forward<Args>(args) ...));
 }
 
-template <typename T, typename F, typename Tuple>
-constexpr auto invokeMethod(T *self, F &&f, Tuple &&args)
+template <typename V, typename R, typename T, typename P, typename ... Args>
+struct MetaFunction
 {
-    return Implementation::invokeMethodByTuple(
-        self,
-        std::forward<F>(f),
-        std::forward<Tuple>(args),
-        std::make_index_sequence<std::tuple_size<std::decay_t<Tuple>>::value>()
-    );
-}
+    static V invoke(T *self, R (T::*&&method)(Args ...), P &tuple)
+    {
+        /* non-void return type version */
+        return V(Implementation::invokeByTuple(self, std::move(method), tuple, std::index_sequence_for<Args ...>()));
+    }
+};
+
+template <typename V, typename T, typename P, typename ... Args>
+struct MetaFunction<V, void, T, P, Args ...>
+{
+    static V invoke(T *self, void (T::*&&method)(Args ...), P &tuple)
+    {
+        /* void return type specification */
+        Implementation::invokeByTuple(self, std::move(method), tuple, std::index_sequence_for<Args ...>());
+        return V();
+    }
+};
 }
 }
 }
