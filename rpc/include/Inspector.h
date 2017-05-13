@@ -48,8 +48,8 @@ private:
     Deserializer _deserializer;
 
 public:
-    explicit Field(const std::string &name, const Type &type, size_t offset, Serializer &&serializer, Deserializer &&deserializer) :
-        _type(type), _name(name), _offset(offset), _serializer(serializer), _deserializer(deserializer) {}
+    explicit Field(std::string &&name, Type &&type, size_t offset, Serializer &&serializer, Deserializer &&deserializer) :
+        _name(std::move(name)), _type(std::move(type)), _offset(offset), _serializer(serializer), _deserializer(deserializer) {}
 
 public:
     size_t offset(void) const { return _offset; }
@@ -246,7 +246,7 @@ public:
 
     public:
         template <typename FieldType>
-        explicit MemberData(const std::string &name, const FieldType &reference) :
+        explicit MemberData(const char *name, const FieldType &reference) :
             isMethod(false), field(new Field(
                 name,
                 TypeItem<FieldType>::type(),
