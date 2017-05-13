@@ -38,10 +38,10 @@ constexpr typename Expander<T>::Type &expand(T &&value)
     return Expander<T>::expand(std::forward<T>(value));
 }
 
-template <typename T, typename F, class ArgsTuple, size_t ... Index>
-constexpr auto invokeByTuple(T *self, F &&f, ArgsTuple &&args, std::index_sequence<Index ...>)
+template <typename T, typename F, class P, size_t ... I>
+constexpr auto invokeByTuple(T *self, F &&f, P &&args, std::index_sequence<I ...>)
 {
-    return (self->*f)(expand(std::get<Index>(std::forward<ArgsTuple>(args))) ...);
+    return (self->*f)(expand(std::get<I>(std::forward<P>(args))) ...);
 }
 }
 
