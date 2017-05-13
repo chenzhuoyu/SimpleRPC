@@ -22,7 +22,7 @@ public:
 
 public:
     T &operator*() const { return *_value; }
-    TypeWrapper(std::shared_ptr<T> &&value) : _value(value) {}
+    TypeWrapper(std::shared_ptr<T> &&value) : _value(std::move(value)) {}
 
 };
 

@@ -49,7 +49,11 @@ private:
 
 public:
     explicit Field(std::string &&name, Type &&type, size_t offset, Serializer &&serializer, Deserializer &&deserializer) :
-        _name(std::move(name)), _type(std::move(type)), _offset(offset), _serializer(serializer), _deserializer(deserializer) {}
+        _offset         (offset),
+        _name           (std::move(name)),
+        _type           (std::move(type)),
+        _serializer     (std::move(serializer)),
+        _deserializer   (std::move(deserializer)) {}
 
 public:
     size_t offset(void) const { return _offset; }
@@ -96,11 +100,11 @@ private:
 public:
     template <typename R, typename ... Args>
     explicit Method(MetaMethod<R, Args ...> &&method, Proxy &&proxy) :
+        _proxy      (std::move(proxy)),
         _args       (std::move(method.args)),
         _name       (std::move(method.name)),
         _result     (std::move(method.result)),
-        _signature  (std::move(method.signature)),
-        _proxy      (std::move(proxy)) {}
+        _signature  (std::move(method.signature)) {}
 
 public:
     const Type &result(void) const { return _result; }
@@ -246,11 +250,11 @@ public:
 
     public:
         template <typename FieldType>
-        explicit MemberData(const char *name, const FieldType &reference) :
+        explicit MemberData(const char *name, FieldType &ref) :
             isMethod(false), field(new Field(
-                name,
+                std::string(name),
                 TypeItem<FieldType>::type(),
-                reinterpret_cast<uintptr_t>(&reference),
+                reinterpret_cast<uintptr_t>(&ref),
                 [](const Field *field, const void *self)
                 {
                     /* using the template to resolve types during compilation */
@@ -272,7 +276,7 @@ public:
         explicit MemberData(const char *name, Result (T::*&&method)(Args ...)) :
             isMethod(true), method(new Method(
                 MetaMethod<Result, Args ...>(name),
-                [=](Serializable *self, Variant &argv) mutable
+                [f = std::move(method)](Serializable *self, Variant &argv) mutable
                 {
                     /* wrapped argument types tuple */
                     typedef std::tuple<typename TypeRef<Args>::Type ...> Tuple;
@@ -285,7 +289,7 @@ public:
 
                     /* build arguments tuple and invoke target method through meta function wrapper */
                     auto tuple = ParamTuple<Args ...>::expand(argv);
-                    auto result = Functional::MetaFunction<Variant, Result, T, Tuple, Args ...>::invoke(static_cast<T *>(self), std::move(method), tuple);
+                    auto result = Functional::MetaFunction<Variant, Result, T, Tuple, Args ...>::invoke(static_cast<T *>(self), std::move(f), tuple);
 
                     /* patch mutable arguments back into `argv` */
                     BackPatcher<Tuple, Args ...>::patch(argv, std::move(tuple));
@@ -307,9 +311,9 @@ public:
         for (const MemberData &info : members)
         {
             if (!info.isMethod)
-                fields.insert({ info.field->name(), std::move(info.field) });
+                fields.emplace(info.field->name(), std::move(info.field));
             else
-                methods.insert({ info.method->signature(), std::move(info.method) });
+                methods.emplace(info.method->signature(), std::move(info.method));
         }
 
         Registry::addClass(std::make_shared<Registry::Meta>(

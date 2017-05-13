@@ -24,13 +24,6 @@ private:
     size_t _length = 0;
     size_t _capacity = 0;
 
-private:
-    static constexpr inline size_t alignUp(size_t value)
-    {
-        /* aligh up with 256 */
-        return (value + 0xff) & ~0xff;
-    }
-
 public:
     ByteSeq() {}
    ~ByteSeq() { free(_mem); }

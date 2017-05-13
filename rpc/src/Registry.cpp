@@ -13,7 +13,7 @@ static std::unordered_map<std::string, std::shared_ptr<Registry::Meta>> _registr
 void Registry::addClass(std::shared_ptr<Registry::Meta> &&meta)
 {
     if (_registry.find(meta->name()) == _registry.end())
-        _registry.insert({ meta->name(), meta });
+        _registry.emplace(meta->name(), std::move(meta));
 }
 
 const Registry::Meta &Registry::findClass(const std::string &name)

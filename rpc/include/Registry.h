@@ -43,8 +43,8 @@ struct Registry
 
     public:
         explicit Meta() : _constructor(nullptr) {}
-        explicit Meta(const std::string &name, FieldMap &&fields, MethodMap &&methods, Constructor &&constructor) :
-            _name(name), _fields(std::move(fields)), _methods(std::move(methods)), _constructor(std::move(constructor)) {}
+        explicit Meta(std::string &&name, FieldMap &&fields, MethodMap &&methods, Constructor &&constructor) :
+            _name(std::move(name)), _fields(std::move(fields)), _methods(std::move(methods)), _constructor(std::move(constructor)) {}
 
     public:
         Meta(Meta &&other)

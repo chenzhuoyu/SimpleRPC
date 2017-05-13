@@ -62,8 +62,9 @@ struct Backend final
 
     public:
         explicit BackendProxy(
-            std::function<Variant(ByteSeq &&)> parser,
-            std::function<ByteSeq(Variant &&)> assembler) : _parser(parser), _assembler(assembler) {}
+            std::function<Variant(ByteSeq &&)> &&parser,
+            std::function<ByteSeq(Variant &&)> &&assembler) :
+                _parser(std::move(parser)), _assembler(std::move(assembler)) {}
 
     public:
         Variant parse(ByteSeq &&data) const { return _parser(std::move(data)); }
@@ -74,6 +75,9 @@ struct Backend final
 private:
     static std::shared_ptr<BackendProxy> _defaultBackend;
     static std::unordered_map<std::string, std::shared_ptr<BackendProxy>> _backends;
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCSimplifyInspection"
 
 public:
     template <typename T>
@@ -91,15 +95,17 @@ public:
             throw Exceptions::BackendDuplicatedError(name);
 
         /* build backend proxy and add to registry */
-        _backends.insert({ name, std::make_shared<BackendProxy>(
+        _backends.emplace(name, std::make_shared<BackendProxy>(
             [=](ByteSeq &&data) { return backend->parse(std::move(data)); },
             [=](Variant &&data) { return backend->assemble(std::move(data)); }
-        ) });
+        ));
 
         /* set as default backend if not specified */
         if (_defaultBackend == nullptr)
             _defaultBackend = _backends.at(name);
     }
+
+#pragma clang diagnostic pop
 
 public:
     static const std::shared_ptr<BackendProxy> &findBackend(const std::string &name)

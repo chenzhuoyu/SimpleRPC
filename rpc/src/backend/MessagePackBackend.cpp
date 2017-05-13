@@ -131,7 +131,7 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
 
             /* parse each element */
             while (n--)
-                result.internalArray().push_back(std::make_shared<Variant>(std::move(doParse(data))));
+                result.internalArray().push_back(std::make_shared<Variant>(doParse(data)));
 
             return result;
         }
@@ -159,10 +159,10 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
                 if (key.type() != Internal::Type::TypeCode::String)
                     throw Exceptions::DeserializerError("Keys of \"Object\" type must be strings");
 
-                result.internalObject().insert({
+                result.internalObject().emplace(
                     key.get<const std::string &>(),
                     std::make_shared<Variant>(std::move(value))
-                });
+                );
             }
 
             return result;
@@ -183,7 +183,6 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
 ByteSeq MessagePackBackend::doAssemble(Variant &object) const
 {
     ByteSeq result;
-
     switch (object.type())
     {
         case Internal::Type::TypeCode::Void:

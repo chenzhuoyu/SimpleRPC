@@ -76,8 +76,8 @@ public:
 
 public:
     /* array sub-item type */
-    explicit Type(TypeCode typeCode, const Type &itemType, bool isMutable) :
-        _typeCode(TypeCode::Array), _itemType(new Type(itemType)), _isMutable(isMutable)
+    explicit Type(TypeCode typeCode, Type &&itemType, bool isMutable) :
+        _typeCode(TypeCode::Array), _itemType(new Type(std::move(itemType))), _isMutable(isMutable)
     {
         if (itemType.isMutable())
         {
@@ -94,8 +94,8 @@ public:
 
 public:
     /* object type */
-    explicit Type(TypeCode typeCode, const std::string &className, bool isMutable) :
-        _typeCode(TypeCode::Object), _className(className), _isMutable(isMutable)
+    explicit Type(TypeCode typeCode, std::string &&className, bool isMutable) :
+        _typeCode(TypeCode::Object), _className(std::move(className)), _isMutable(isMutable)
     {
         if (typeCode != TypeCode::Object)
         {

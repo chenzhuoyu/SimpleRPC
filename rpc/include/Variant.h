@@ -382,7 +382,7 @@ public:
         if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
         else if (_object.find(key) == _object.end())
-            _object.insert({ key, std::make_shared<Variant>(0) });
+            _object.emplace(key, std::make_shared<Variant>(0));
 
         /* guaranted we have this key */
         return *_object.at(key);
