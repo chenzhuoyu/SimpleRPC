@@ -266,7 +266,7 @@ public:
         if (_type == Type::TypeCode::Float)
             return _float;
         else
-            throw Exceptions::TypeError(toString() + " is not a float");
+            throw Exceptions::TypeError(toString() + " is not a `float`");
     }
 
 public:
@@ -276,7 +276,7 @@ public:
         if (_type == Type::TypeCode::Double)
             return _double;
         else
-            throw Exceptions::TypeError(toString() + " is not a double");
+            throw Exceptions::TypeError(toString() + " is not a `double`");
     }
 
 /** boolean **/
@@ -288,7 +288,7 @@ public:
         if (_type == Type::TypeCode::Boolean)
             return _bool;
         else
-            throw Exceptions::TypeError(toString() + " is not a boolean");
+            throw Exceptions::TypeError(toString() + " is not a `bool`");
     }
 
 /** STL string **/
@@ -300,7 +300,7 @@ public:
         if (_type == Type::TypeCode::String)
             return _string;
         else
-            throw Exceptions::TypeError(toString() + " is not a string");
+            throw Exceptions::TypeError(toString() + " is not a `std::string`");
     }
 
 /** Wrapped objects (arrays and objects) **/
