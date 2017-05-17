@@ -411,6 +411,9 @@ public:
 
 /** END **/
 
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "InfiniteRecursion"
+
 private:
     template <typename ... Args>
     struct ArrayBuilder;
@@ -419,32 +422,27 @@ private:
     template <typename Arg, typename ... Args>
     struct ArrayBuilder<Arg, Args ...>
     {
-        static void build(Array &array, const Arg &arg, const Args & ... args)
+        static void build(Array &array, Arg &&arg, Args && ... args)
         {
-            array.push_back(std::make_shared<Variant>(arg));
-            ArrayBuilder<Args ...>::build(array, args ...);
+            array.emplace_back(std::make_shared<Variant>(std::forward<Arg>(arg)));
+            ArrayBuilder<Args ...>::build(array, std::forward<Args>(args) ...);
         }
     };
 
-private:
-    template <typename Arg>
-    struct ArrayBuilder<Arg>
-    {
-        static void build(Array &array, const Arg &arg)
-        {
-            /* last recursion, only one argument left */
-            array.push_back(std::make_shared<Variant>(arg));
-        }
-    };
+#pragma clang diagnostic pop
 
 public:
     template <typename ... Args>
-    static Variant array(const Args & ... args)
+    static Variant array(Args && ... args)
     {
         Variant result(Type::TypeCode::Array);
         std::vector<std::shared_ptr<Variant>> array;
-        ArrayBuilder<Args ...>::build(array, args ...);
 
+        /* reserve spaces to prevent frequent malloc() */
+        array.reserve(sizeof ... (Args));
+        ArrayBuilder<Args ...>::build(array, std::forward<Args>(args) ...);
+
+        /* replace internal array */
         result._array = std::move(array);
         return result;
     }
@@ -538,6 +536,17 @@ public:
                 return "{" + result + "}";
             }
         }
+    }
+};
+
+/* specification must be placed out-side of the class */
+template <>
+struct Variant::ArrayBuilder<>
+{
+    static void build(Array &array)
+    {
+        /* last recursion, nothing left */
+        /* thus nothing to do */
     }
 };
 }

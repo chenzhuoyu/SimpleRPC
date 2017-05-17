@@ -143,7 +143,7 @@ struct ParamTupleImpl<I, Item, Items ...>
     static std::tuple<Item, Items ...> expand(Variant &array)
     {
         return std::tuple_cat(
-            std::forward_as_tuple(array[I].template get<Item>()),
+            std::forward_as_tuple(array[I].get<Item>()),
             ParamTupleImpl<I + 1, Items ...>::expand(array)
         );
     }
@@ -179,7 +179,7 @@ struct ObjectPatcher<I, T, U, true>
 {
     static void patch(Variant &array, U &item)
     {
-        /* for object, re-serialize to `Variant` */
+        /* for objects, re-serialize to `Variant` */
         array[I] = (*item).serialize();
     }
 };
@@ -201,7 +201,7 @@ struct ItemPatcher<I, std::vector<T> &>
     template <typename U>
     static void patch(Variant &array, U &item)
     {
-        /* for array, simply assign back */
+        /* for arrays, simply assign back */
         array[I] = std::move(*item);
     }
 };

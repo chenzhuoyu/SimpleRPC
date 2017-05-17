@@ -95,14 +95,14 @@ public:
             throw Exceptions::BackendDuplicatedError(name);
 
         /* build backend proxy and add to registry */
-        _backends.emplace(name, std::make_shared<BackendProxy>(
+        auto iter = _backends.emplace(name, std::make_shared<BackendProxy>(
             [=](ByteSeq &&data) { return backend->parse(std::move(data)); },
             [=](Variant &&data) { return backend->assemble(std::move(data)); }
         ));
 
         /* set as default backend if not specified */
         if (_defaultBackend == nullptr)
-            _defaultBackend = _backends.at(name);
+            _defaultBackend = iter.first->second;
     }
 
 #pragma clang diagnostic pop

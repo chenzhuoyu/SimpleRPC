@@ -36,7 +36,7 @@ Variant Serializable::serialize(void) const
     return result;
 }
 
-void Serializable::deserialize(const Variant &value)
+void Serializable::deserialize(Variant &&value)
 {
     if (value.type() != Type::TypeCode::Object)
         throw Exceptions::TypeError(value.toString() + " is not an object");
@@ -55,6 +55,12 @@ void Serializable::deserialize(const Variant &value)
         else
             throw Exceptions::ReflectionError("Missing field \"" + field.first + "\"");
     }
+}
+
+void Serializable::deserialize(const Variant &value)
+{
+    /* must implement here cause `Variant` is not a complete type in the header */
+    deserialize(Variant(value));
 }
 }
 }

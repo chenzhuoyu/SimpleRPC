@@ -100,8 +100,10 @@ struct Serializable
 private:
     const Meta &_meta;
 
-protected:
+public:
     virtual ~Serializable() {}
+
+protected:
     explicit Serializable(const Meta &meta) : _meta(meta) {}
 
 public:
@@ -111,6 +113,7 @@ public:
     Variant serialize(void) const;
 
 public:
+    void deserialize(Variant &&value);
     void deserialize(const Variant &value);
 
 };

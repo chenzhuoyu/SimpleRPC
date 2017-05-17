@@ -8,13 +8,14 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Darwin")
     include_directories(/usr/local/include)
 endif()
 
-include_directories(
-        ${CMAKE_SOURCE_DIR}/rpc/include
-        ${CMAKE_SOURCE_DIR}/rpc/include/backend)
+include_directories(${CMAKE_SOURCE_DIR}/rpc/include)
 
 set(SIMPLE_RPC
         rpc/include/backend/Backend.h
         rpc/include/backend/MessagePackBackend.h
+        rpc/include/network/CallSite.h
+        rpc/include/network/InvokeProxy.h
+        rpc/include/network/LocalCallSite.h
         rpc/include/ByteSeq.h
         rpc/include/Exceptions.h
         rpc/include/Functional.h
@@ -22,11 +23,13 @@ set(SIMPLE_RPC
         rpc/include/Registry.h
         rpc/include/SimpleRPC.h
         rpc/include/TypeInfo.h
+        rpc/include/TypeWrapper.h
         rpc/include/Variant.h
         rpc/src/backend/Backend.cpp
         rpc/src/backend/MessagePackBackend.cpp
+        rpc/src/network/LocalCallSite.cpp
         rpc/src/ByteSeq.cpp
-        rpc/src/Registry.cpp rpc/include/TypeWrapper.h)
+        rpc/src/Registry.cpp)
 
 add_executable(SimpleRPC ${SIMPLE_RPC} main.cpp)
 target_link_libraries(SimpleRPC)
