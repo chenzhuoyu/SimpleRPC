@@ -13,7 +13,6 @@ namespace SimpleRPC
 {
 namespace Network
 {
-template <typename T>
 class InvokeProxy
 {
     size_t _id;
@@ -21,8 +20,8 @@ class InvokeProxy
     std::string _class;
 
 public:
-    virtual ~InvokeProxy() { if (_id) _site->cleanup(_id); }
-    explicit InvokeProxy(CallSite *site) : _id(0), _site(nullptr), _class(Internal::TypeItem<T>::type().toSignature()) { setSite(site); }
+    virtual ~InvokeProxy() { setSite(nullptr); }
+    explicit InvokeProxy(CallSite *site, const std::string &name) : _id(0), _site(nullptr), _class(name) { setSite(site); }
 
 public:
     size_t id(void) const { return _id; }
@@ -49,6 +48,13 @@ public:
         else
             return _site->invoke(_id, Internal::MetaMethod<R, Args ...>(name), std::forward<Args>(args) ...);
     }
+};
+
+template <typename T>
+struct InvokeProxyAdapter : public InvokeProxy
+{
+    explicit InvokeProxyAdapter(CallSite *site) :
+        InvokeProxy(site, Internal::TypeItem<T>::type().toSignature()) {}
 };
 }
 }

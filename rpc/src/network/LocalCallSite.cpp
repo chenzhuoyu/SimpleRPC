@@ -36,7 +36,7 @@ void LocalCallSite::cleanup(size_t id) noexcept
 
 size_t LocalCallSite::startup(const std::string &name)
 {
-    size_t newId = __sync_add_and_fetch(&_id, 1);
+    size_t newId = __sync_fetch_and_add(&_id, 1);
     const auto &meta = Internal::Registry::findClass(name);
 
     /* instaniate object and register into object map */

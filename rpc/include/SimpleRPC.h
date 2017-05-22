@@ -38,9 +38,9 @@ struct SerializableWrapper : public Serializable
         type() {}                                                                                                                       \
         BOOST_PP_SEQ_FOR_EACH(__SRPC_MEMBER_DECL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                                          \
                                                                                                                                         \
-        struct Proxy : public ::SimpleRPC::Network::InvokeProxy<type>                                                                   \
+        struct Proxy : public ::SimpleRPC::Network::InvokeProxyAdapter<type>                                                            \
         {                                                                                                                               \
-            using ::SimpleRPC::Network::InvokeProxy<type>::InvokeProxy;                                                                 \
+            using ::SimpleRPC::Network::InvokeProxyAdapter<type>::InvokeProxyAdapter;                                                   \
             BOOST_PP_SEQ_FOR_EACH(__SRPC_PROXY_DECL, type, BOOST_PP_VARIADIC_TO_SEQ(__VA_ARGS__))                                       \
         };                                                                                                                              \
     };                                                                                                                                  \
@@ -63,13 +63,13 @@ struct SerializableWrapper : public Serializable
 
 #define __SRPC_PROXY_DECL_RAW(type, elem)
 #define __SRPC_PROXY_DECL_VAR(type, elem)
-#define __SRPC_PROXY_DECL_FUNC(type, elem)                                                      \
-    BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (__SRPC_PROXY_ARG_LIST(elem))         \
-    {                                                                                           \
-        return ::SimpleRPC::Network::InvokeProxy<type>::invoke<BOOST_PP_SEQ_ELEM(1, elem)>(     \
-            BOOST_PP_STRINGIZE(BOOST_PP_SEQ_ELEM(2, elem)),                                     \
-            __SRPC_PROXY_CALL_LIST(elem)                                                        \
-        );                                                                                      \
+#define __SRPC_PROXY_DECL_FUNC(type, elem)                                                          \
+    BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (__SRPC_PROXY_ARG_LIST(elem))             \
+    {                                                                                               \
+        return ::SimpleRPC::Network::InvokeProxyAdapter<type>::invoke<BOOST_PP_SEQ_ELEM(1, elem)>(  \
+            BOOST_PP_STRINGIZE(BOOST_PP_SEQ_ELEM(2, elem)),                                         \
+            __SRPC_PROXY_CALL_LIST(elem)                                                            \
+        );                                                                                          \
     }
 
 #define __SRPC_MEMBER_DECL_RAW(type, elem)              BOOST_PP_SEQ_ELEM(1, elem)
