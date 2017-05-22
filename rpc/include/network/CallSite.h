@@ -92,7 +92,7 @@ struct ObjectPatcher<I, T, U, false, true>
     static void patch(Internal::Variant &array, U &&item)
     {
         /* for non-objects, simply assign back */
-        item = Unwrapper<U>::unwrap(std::move(array[I]));
+        item = std::move(Unwrapper<U>::unwrap(std::move(array[I])));
     }
 };
 
