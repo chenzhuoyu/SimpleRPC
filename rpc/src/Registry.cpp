@@ -5,8 +5,6 @@
 
 namespace SimpleRPC
 {
-namespace Internal
-{
 /* class factory registry */
 static std::unordered_map<std::string, std::shared_ptr<Registry::Meta>> _registry;
 
@@ -61,6 +59,5 @@ void Serializable::deserialize(const Variant &value)
 {
     /* must implement here cause `Variant` is not a complete type in the header */
     deserialize(Variant(value));
-}
 }
 }

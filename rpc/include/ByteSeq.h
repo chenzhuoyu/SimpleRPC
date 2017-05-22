@@ -13,8 +13,6 @@
 
 namespace SimpleRPC
 {
-namespace Internal
-{
 class ByteSeq
 {
     char *_mem = nullptr;
@@ -118,7 +116,6 @@ public:
     static std::string hexdump(const void *data, size_t size);
 
 };
-}
 }
 
 #endif /* SIMPLERPC_BYTESEQ_H */

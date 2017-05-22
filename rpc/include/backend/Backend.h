@@ -52,6 +52,7 @@ struct AssemblerCheck<ByteSeq(T::*)(Variant &&) const>
 {
     static constexpr bool value = true;
 };
+}
 
 struct Backend final
 {
@@ -145,7 +146,7 @@ public:
     struct Register
     {
         static_assert(
-            NameCheck<decltype(&T::name)>::value,
+            Internal::NameCheck<decltype(&T::name)>::value,
             "Backend must have `std::string name(void) const` method"
         );
 
@@ -158,11 +159,6 @@ public:
 };
 }
 
-/* export some useful classes */
-typedef Internal::ByteSeq ByteSeq;
-typedef Internal::Backend Backend;
-}
-
-#define defineBackend(type) static ::SimpleRPC::Internal::Backend::Register<type> __SimpleRPC_Backend_ ## type ## _DO_NOT_TOUCH_THIS_VARIABLE__;
+#define defineBackend(type) static ::SimpleRPC::Backend::Register<type> __SimpleRPC_Backend_ ## type ## _DO_NOT_TOUCH_THIS_VARIABLE__;
 
 #endif /* SIMPLERPC_BACKEND_H */

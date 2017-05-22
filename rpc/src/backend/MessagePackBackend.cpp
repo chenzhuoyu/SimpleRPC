@@ -127,7 +127,7 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
                 static_cast<size_t>(ch & 0x0f);         /* fixarray */
 
             /* make an array variant */
-            Variant result(Internal::Type::TypeCode::Array);
+            Variant result(Type::TypeCode::Array);
 
             /* parse each element */
             while (n--)
@@ -149,14 +149,14 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
                 static_cast<size_t>(ch & 0x0f);         /* fixmap */
 
             /* make an object variant */
-            Variant result(Internal::Type::TypeCode::Object);
+            Variant result(Type::TypeCode::Object);
 
             while (n--)
             {
                 Variant key   = doParse(data); /* odd elements in objects are keys of a map */
                 Variant value = doParse(data); /* the next element of a key is its associated value */
 
-                if (key.type() != Internal::Type::TypeCode::String)
+                if (key.type() != Type::TypeCode::String)
                     throw Exceptions::DeserializerError("Keys of \"Object\" type must be strings");
 
                 result.internalObject().emplace(
@@ -185,14 +185,14 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
     ByteSeq result;
     switch (object.type())
     {
-        case Internal::Type::TypeCode::Void:
+        case Type::TypeCode::Void:
         {
             /* `void` is serialized as `Nil` */
             result.appendBE((uint8_t)0xc0);
             break;
         }
 
-        case Internal::Type::TypeCode::Int8:
+        case Type::TypeCode::Int8:
         {
             /* convert to `int8_t` */
             int8_t value = object.get<int8_t>();
@@ -210,70 +210,70 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
             break;
         }
 
-        case Internal::Type::TypeCode::Int16:
+        case Type::TypeCode::Int16:
         {
             result.appendBE((uint8_t)0xd1);
             result.appendBE(object.get<int16_t>());
             break;
         }
 
-        case Internal::Type::TypeCode::Int32:
+        case Type::TypeCode::Int32:
         {
             result.appendBE((uint8_t)0xd2);
             result.appendBE(object.get<int32_t>());
             break;
         }
 
-        case Internal::Type::TypeCode::Int64:
+        case Type::TypeCode::Int64:
         {
             result.appendBE((uint8_t)0xd3);
             result.appendBE(object.get<int64_t>());
             break;
         }
 
-        case Internal::Type::TypeCode::UInt8:
+        case Type::TypeCode::UInt8:
         {
             result.appendBE((uint8_t)0xcc);
             result.appendBE(object.get<uint8_t>());
             break;
         }
 
-        case Internal::Type::TypeCode::UInt16:
+        case Type::TypeCode::UInt16:
         {
             result.appendBE((uint8_t)0xcd);
             result.appendBE(object.get<uint8_t>());
             break;
         }
 
-        case Internal::Type::TypeCode::UInt32:
+        case Type::TypeCode::UInt32:
         {
             result.appendBE((uint8_t)0xce);
             result.appendBE(object.get<uint8_t>());
             break;
         }
 
-        case Internal::Type::TypeCode::UInt64:
+        case Type::TypeCode::UInt64:
         {
             result.appendBE((uint8_t)0xcf);
             result.appendBE(object.get<uint8_t>());
             break;
         }
 
-        case Internal::Type::TypeCode::Float:
+        case Type::TypeCode::Float:
         {
             result.appendBE((uint8_t)0xca);
             result.appendBE(object.get<float>());
             break;
         }
 
-        case Internal::Type::TypeCode::Double:
+        case Type::TypeCode::Double:
         {
             result.appendBE((uint8_t)0xcb);
             result.appendBE(object.get<double>());
             break;
         }
 
-        case Internal::Type::TypeCode::Boolean:
+        case Type::TypeCode::Boolean:
         {
             if (object.get<bool>())
                 result.appendBE((uint8_t)0xc3);
@@ -283,7 +283,7 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
             break;
         }
 
-        case Internal::Type::TypeCode::String:
+        case Type::TypeCode::String:
         {
             /* get as reference to prevent copy */
             const std::string &s = object.get<const std::string &>();
@@ -322,7 +322,7 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
             break;
         }
 
-        case Internal::Type::TypeCode::Array:
+        case Type::TypeCode::Array:
         {
             if (object.internalArray().size() <= 15)
             {
@@ -354,7 +354,7 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
             break;
         }
 
-        case Internal::Type::TypeCode::Object:
+        case Type::TypeCode::Object:
         {
             if (object.internalObject().size() <= 15)
             {

@@ -21,8 +21,6 @@
 
 namespace SimpleRPC
 {
-namespace Internal
-{
 class Variant final
 {
     union
@@ -42,7 +40,7 @@ class Variant final
         double   _double;
 
         /* used by copy constructor and move constructor / assignment */
-        uint8_t  _buffer[Functional::max(
+        uint8_t  _buffer[Internal::Functional::max(
             sizeof(int8_t   ),
             sizeof(int16_t  ),
             sizeof(int32_t  ),
@@ -177,7 +175,7 @@ private:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int8_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int8_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::Int8)
             return static_cast<T>(_s8);
@@ -187,7 +185,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int16_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int16_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::Int16)
             return static_cast<T>(_s16);
@@ -197,7 +195,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int32_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int32_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::Int32)
             return static_cast<T>(_s32);
@@ -207,7 +205,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsSignedIntegerLike<T, int64_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int64_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::Int64)
             return static_cast<T>(_s64);
@@ -219,7 +217,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint8_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint8_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::UInt8)
             return static_cast<T>(_u8);
@@ -229,7 +227,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint16_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint16_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::UInt16)
             return static_cast<T>(_u16);
@@ -239,7 +237,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint32_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint32_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::UInt32)
             return static_cast<T>(_u32);
@@ -249,7 +247,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsUnsignedIntegerLike<T, uint64_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint64_t>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::UInt64)
             return static_cast<T>(_u64);
@@ -307,7 +305,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<IsTypeWrapper<T>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsTypeWrapper<T>::value, Tag> = Tag())
     {
         /* let the compiler decide which override should be used */
         return T(getWrapped<typename T::Type>());
@@ -315,7 +313,7 @@ public:
 
 private:
     template <typename T>
-    inline std::shared_ptr<T> getWrapped(std::enable_if_t<IsVector<T>::value, Tag> = Tag())
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag())
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
@@ -325,7 +323,7 @@ private:
 
         /* fill each item */
         for (const auto &item : _array)
-            array->push_back(item->get<typename IsVector<T>::ItemType>());
+            array->push_back(item->get<typename Internal::IsVector<T>::ItemType>());
 
         return std::move(array);
     }
@@ -549,7 +547,6 @@ struct Variant::ArrayBuilder<>
         /* thus nothing to do */
     }
 };
-}
 }
 
 #endif /* SIMPLERPC_VARIANT_H */

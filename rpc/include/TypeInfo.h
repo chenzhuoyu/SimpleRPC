@@ -13,8 +13,6 @@
 
 namespace SimpleRPC
 {
-namespace Internal
-{
 /****** Type descriptor ******/
 
 class Type final
@@ -174,6 +172,8 @@ public:
     }
 };
 
+namespace Internal
+{
 /****** Type resolvers ******/
 
 /* type size container */
@@ -343,7 +343,7 @@ struct MetaArgs
     }
 };
 
-template <typename R, typename ... Args>
+template <typename ReturnType, typename ... Args>
 struct MetaMethod
 {
     Type result;
@@ -352,8 +352,11 @@ struct MetaMethod
     std::vector<Type> args;
 
 public:
-    explicit MetaMethod(const char *name) :
-        name(name), args(MetaArgs<Args ...>::type()), result(TypeItem<R>::type())
+    constexpr explicit MetaMethod() : MetaMethod("") {}
+    constexpr explicit MetaMethod(const char *name) :
+        name(name),
+        args(MetaArgs<Args ...>::type()),
+        result(TypeItem<ReturnType>::type())
     {
         signature = name;
         signature += "(";
@@ -362,7 +365,7 @@ public:
             signature += type.toSignature();
 
         signature += ")";
-        signature += TypeItem<R>::type().toSignature();
+        signature += TypeItem<ReturnType>::type().toSignature();
     }
 };
 

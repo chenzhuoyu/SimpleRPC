@@ -12,9 +12,6 @@
 namespace SimpleRPC
 {
 /****** Reflection registry ******/
-
-namespace Internal
-{
 struct Field;
 struct Method;
 struct Serializable;
@@ -117,7 +114,6 @@ public:
     void deserialize(const Variant &value);
 
 };
-}
 }
 
 #endif /* SIMPLERPC_REGISTRY_H */

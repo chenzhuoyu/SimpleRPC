@@ -15,7 +15,7 @@ namespace Exceptions
 class Exception : public std::runtime_error
 {
 public:
-    explicit Exception(const std::string &message) : runtime_error(message) {}
+    explicit Exception(const std::string &message) : std::runtime_error(message) {}
 
 };
 

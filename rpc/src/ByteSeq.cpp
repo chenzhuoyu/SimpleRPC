@@ -4,8 +4,6 @@
 
 namespace SimpleRPC
 {
-namespace Internal
-{
 void ByteSeq::swap(ByteSeq &other)
 {
     std::swap(_mem, other._mem);
@@ -232,6 +230,5 @@ std::string ByteSeq::hexdump(const void *data, size_t size)
     }
 
     return result;
-}
 }
 }

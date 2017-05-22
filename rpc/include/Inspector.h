@@ -25,8 +25,6 @@
 
 namespace SimpleRPC
 {
-namespace Internal
-{
 /****** Field meta-data ******/
 
 class Field
@@ -99,7 +97,7 @@ private:
 
 public:
     template <typename R, typename ... Args>
-    explicit Method(MetaMethod<R, Args ...> &&method, Proxy &&proxy) :
+    explicit Method(Internal::MetaMethod<R, Args ...> &&method, Proxy &&proxy) :
         _proxy      (std::move(proxy)),
         _args       (std::move(method.args)),
         _name       (std::move(method.name)),
@@ -120,6 +118,8 @@ public:
 
 };
 
+namespace Internal
+{
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCSimplifyInspection"
 
@@ -234,6 +234,7 @@ template <typename Tuple, typename ... Args>
 using BackPatcher = BackPatcherImpl<0, Tuple, Args ...>;
 
 #pragma clang diagnostic pop
+}
 
 /****** Reflection registry descriptor ******/
 
@@ -254,7 +255,7 @@ public:
         explicit MemberData(const char *name, FieldType &ref) :
             isMethod(false), field(new Field(
                 std::string(name),
-                TypeItem<FieldType>::type(),
+                Internal::TypeItem<FieldType>::type(),
                 reinterpret_cast<uintptr_t>(&ref),
                 [](const Field *field, const void *self)
                 {
@@ -276,11 +277,11 @@ public:
         template <typename Result, typename ... Args>
         explicit MemberData(const char *name, Result (T::*&&method)(Args ...)) :
             isMethod(true), method(new Method(
-                MetaMethod<Result, Args ...>(name),
+                Internal::MetaMethod<Result, Args ...>(name),
                 [f = std::move(method)](Serializable *self, Variant &argv) mutable
                 {
                     /* wrapped argument types tuple */
-                    typedef std::tuple<typename TypeRef<Args>::Type ...> Tuple;
+                    typedef std::tuple<typename Internal::TypeRef<Args>::Type ...> Tuple;
 
                     /* check for parameters */
                     if (argv.type() != Type::TypeCode::Array)
@@ -289,11 +290,11 @@ public:
                         throw Exceptions::ArgumentError(sizeof ... (Args), argv.size());
 
                     /* build arguments tuple and invoke target method through meta function wrapper */
-                    auto tuple = ParamTuple<Args ...>::expand(argv);
-                    auto result = Functional::MetaFunction<Variant, Result, T, Tuple, Args ...>::invoke(static_cast<T *>(self), std::move(f), tuple);
+                    auto tuple = Internal::ParamTuple<Args ...>::expand(argv);
+                    auto result = Internal::Functional::MetaFunction<Variant, Result, T, Tuple, Args ...>::invoke(static_cast<T *>(self), std::move(f), tuple);
 
                     /* patch mutable arguments back into `argv` */
-                    BackPatcher<Tuple, Args ...>::patch(argv, std::move(tuple));
+                    Internal::BackPatcher<Tuple, Args ...>::patch(argv, std::move(tuple));
                     return std::move(result);
                 }
             ))
@@ -318,14 +319,13 @@ public:
         }
 
         Registry::addClass(std::make_shared<Registry::Meta>(
-            TypeItem<T>::type().toSignature(),
+            Internal::TypeItem<T>::type().toSignature(),
             std::move(fields),
             std::move(methods),
             []{ return static_cast<Serializable *>(new T); }
         ));
     }
 };
-}
 }
 
 #endif /* SIMPLERPC_INSPECTOR_H */

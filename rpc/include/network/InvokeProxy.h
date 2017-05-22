@@ -43,10 +43,19 @@ public:
     template <typename R, typename ... Args>
     R invoke(const char *name, Args && ... args) const
     {
+        /* check for call-site */
         if (_site == nullptr)
             throw std::runtime_error("Empty call site");
-        else
-            return _site->invoke(_id, Internal::MetaMethod<R, Args ...>(name), std::forward<Args>(args) ...);
+
+        /* define meta-method as `static` `thread_local` here, cause compiler will
+         * generate a unique copy of this `invoke` method for every different template
+         * arguments, thus the static variable `method` containing in those `invoke`
+         * methods are all diffesrent and will be instaniated by corresponding template
+         * types, the `thread_local` specifier is to prevent locks being used */
+        static thread_local Internal::MetaMethod<R, Args ...> method;
+
+        /* invoke actual method through call-site */
+        return _site->invoke<R>(_id, name, method.signature, std::forward<Args>(args) ...);
     }
 };
 
