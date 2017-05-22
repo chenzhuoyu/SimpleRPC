@@ -102,7 +102,6 @@ struct ItemPatcher
     template <typename U>
     static void patch(Internal::Variant &array, U &&item)
     {
-
         /* delegate to object patcher to get around the template problem */
         ObjectPatcher<
             I,
