@@ -21,7 +21,7 @@ class InvokeProxy
     std::string _class;
 
 public:
-    virtual ~InvokeProxy() { _site->cleanup(_id); }
+    virtual ~InvokeProxy() { if (_id) _site->cleanup(_id); }
     explicit InvokeProxy(CallSite *site) : _id(0), _site(nullptr), _class(Internal::TypeItem<T>::type().toSignature()) { setSite(site); }
 
 public:

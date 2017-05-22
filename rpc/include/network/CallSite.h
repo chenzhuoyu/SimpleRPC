@@ -66,7 +66,7 @@ struct Unwrapper<void>
     }
 };
 
-template <size_t I, typename T, typename U, bool IsObject>
+template <size_t I, typename T, typename U, bool IsObject, bool IsMutable>
 struct ObjectPatcher
 {
     static void patch(Internal::Variant &array, U &&item)
@@ -77,12 +77,22 @@ struct ObjectPatcher
 };
 
 template <size_t I, typename T, typename U>
-struct ObjectPatcher<I, T, U, true>
+struct ObjectPatcher<I, T, U, true, true>
 {
     static void patch(Internal::Variant &array, U &&item)
     {
         /* for objects, deserialize from `Variant` */
         item.deserialize(std::move(array[I]));
+    }
+};
+
+template <size_t I, typename T, typename U>
+struct ObjectPatcher<I, T, U, false, true>
+{
+    static void patch(Internal::Variant &array, U &&item)
+    {
+        /* for non-objects, simply assign back */
+        item = Unwrapper<U>::unwrap(std::move(array[I]));
     }
 };
 
@@ -92,19 +102,15 @@ struct ItemPatcher
     template <typename U>
     static void patch(Internal::Variant &array, U &&item)
     {
-        /* delegate to object patcher to get around the template problem */
-        ObjectPatcher<I, T, U, Internal::IsObjectReference<T>::value>::patch(array, std::forward<U>(item));
-    }
-};
 
-template <size_t I, typename T>
-struct ItemPatcher<I, std::vector<T> &>
-{
-    template <typename U>
-    static void patch(Internal::Variant &array, U &&item)
-    {
-        /* for arrays, simply assign back */
-        item = Unwrapper<U>::unwrap(std::move(array[I]));
+        /* delegate to object patcher to get around the template problem */
+        ObjectPatcher<
+            I,
+            T,
+            U,
+            Internal::IsObjectReference<T>::value,
+            Internal::IsMutableReference<T>::value
+        >::patch(array, std::forward<U>(item));
     }
 };
 

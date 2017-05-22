@@ -170,6 +170,7 @@ struct ObjectPatcher
     static void patch(Variant &array, U &item)
     {
         /* read-only argument, no need to patch */
+        /* mutable reference of primitive types are overwritten directly back into `Variant` */
         /* thus do nothing */
     }
 };
@@ -191,7 +192,7 @@ struct ItemPatcher
     static void patch(Variant &array, U &item)
     {
         /* delegate to object patcher to get around the template problem */
-        ObjectPatcher<I, T, U, IsObjectReference<T>::value>::patch(array, item);
+        ObjectPatcher<I, T, U, IsMutableObjectReference<T>::value>::patch(array, item);
     }
 };
 

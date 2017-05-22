@@ -378,9 +378,26 @@ template <typename T>
 struct IsObjectReference
 {
     static const bool value =
+        std::is_convertible<
+            std::decay_t<T> *,
+            Serializable *
+        >::value;
+};
+
+template <typename T>
+struct IsMutableReference
+{
+    static const bool value =
         std::is_lvalue_reference<T>::value &&
-       !std::is_const<std::remove_reference_t<T>>::value &&
-        std::is_convertible<std::decay_t<T> *, Serializable *>::value;
+       !std::is_const<std::remove_reference_t<T>>::value;
+};
+
+template <typename T>
+struct IsMutableObjectReference
+{
+    static const bool value =
+        IsObjectReference<T>::value &&
+        IsMutableReference<T>::value;
 };
 
 template <typename T, typename Integer>
