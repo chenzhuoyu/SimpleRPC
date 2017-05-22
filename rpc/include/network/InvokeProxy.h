@@ -31,11 +31,11 @@ public:
     void setSite(CallSite *site)
     {
         /* cleanup previous registered ID if any */
-        if (_site)
+        if (_site != nullptr)
             _site->cleanup(_id);
 
         /* then register a new ID if any site is present */
-        if ((_site = site))
+        if ((_site = site) != nullptr)
             _id = _site->startup(_class);
     }
 
