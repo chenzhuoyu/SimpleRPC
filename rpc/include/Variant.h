@@ -128,18 +128,8 @@ public:
     Variant(const Variant &other) { assign(other); }
 
 public:
-    Variant &operator=(Variant &&other)
-    {
-        swap(other);
-        return *this;
-    }
-
-public:
-    Variant &operator=(const Variant &other)
-    {
-        assign(other);
-        return *this;
-    }
+    Variant &operator=(Variant &&other)      { swap(other);   return *this; }
+    Variant &operator=(const Variant &other) { assign(other); return *this; }
 
 public:
     void swap(Variant &other)
