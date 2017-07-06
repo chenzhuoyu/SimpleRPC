@@ -3,6 +3,7 @@
 #ifndef SIMPLERPC_REGISTRY_H
 #define SIMPLERPC_REGISTRY_H
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 

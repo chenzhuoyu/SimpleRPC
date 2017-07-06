@@ -78,10 +78,11 @@ public:
     template <typename T>
     T nextBE(void)
     {
-        char d[sizeof(T)];
+        T r;
         char *p = consume(sizeof(T));
-        std::reverse_copy(p, p + sizeof(T), d);
-        return std::move(*reinterpret_cast<T *>(d));
+        char *q = reinterpret_cast<char *>(&r);
+        std::reverse_copy(p, p + sizeof(T), q);
+        return std::move(r);
     }
 
 public:
