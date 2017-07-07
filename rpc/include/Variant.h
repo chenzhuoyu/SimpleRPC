@@ -291,6 +291,40 @@ public:
             throw Exceptions::TypeError(toString() + " is not a `std::string`");
     }
 
+/** Constant objects (arrays and objects) **/
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag())
+    {
+        if (_type != Type::TypeCode::Array)
+            throw Exceptions::TypeError(toString() + " is not an array");
+
+        /* create result array */
+        T array;
+
+        /* fill each item */
+        for (const auto &item : _array)
+            array.push_back(item->get<typename Internal::IsVector<T>::ItemType>());
+
+        return std::move(array);
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag())
+    {
+        if (_type != Type::TypeCode::Object)
+            throw Exceptions::TypeError(toString() + " is not an object");
+
+        /* create result object */
+        T object;
+
+        /* deserialize from self */
+        object.deserialize(*this);
+        return std::move(object);
+    }
+
 /** Wrapped objects (arrays and objects) **/
 
 public:
