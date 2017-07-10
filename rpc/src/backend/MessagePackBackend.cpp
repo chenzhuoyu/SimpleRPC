@@ -122,8 +122,8 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
         case 0x90 ... 0x9f:
         {
             size_t n =
-                ch == 0xdc ? data.nextBE<uint8_t >() :  /* array16  */
-                ch == 0xdd ? data.nextBE<uint16_t>() :  /* array32  */
+                ch == 0xdc ? data.nextBE<uint16_t>() :  /* array16  */
+                ch == 0xdd ? data.nextBE<uint32_t>() :  /* array32  */
                 static_cast<size_t>(ch & 0x0f);         /* fixarray */
 
             /* make an array variant */
@@ -144,8 +144,8 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
         case 0x80 ... 0x8f:
         {
             size_t n =
-                ch == 0xde ? data.nextBE<uint8_t >() :  /* map16  */
-                ch == 0xdf ? data.nextBE<uint16_t>() :  /* map32  */
+                ch == 0xde ? data.nextBE<uint16_t>() :  /* map16  */
+                ch == 0xdf ? data.nextBE<uint32_t>() :  /* map32  */
                 static_cast<size_t>(ch & 0x0f);         /* fixmap */
 
             /* make an object variant */
