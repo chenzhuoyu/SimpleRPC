@@ -28,7 +28,7 @@ Variant Serializable::serialize(void) const
     Variant result(Type::TypeCode::Object);
 
     /* serialize each field */
-    for (const auto &field : _meta.fields())
+    for (const auto &field : _meta->fields())
         result[field.first] = field.second->serialize(this);
 
     return result;
@@ -39,7 +39,7 @@ void Serializable::deserialize(Variant &&value)
     if (value.type() != Type::TypeCode::Object)
         throw Exceptions::TypeError(value.toString() + " is not an object");
 
-    const auto &fields = _meta.fields();
+    const auto &fields = _meta->fields();
     const auto &object = value.internalObject();
 
     for (const auto &field : object)
