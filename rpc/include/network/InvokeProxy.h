@@ -50,7 +50,7 @@ public:
         /* define meta-method as `static` `thread_local` here, cause compiler will
          * generate a unique copy of this `invoke` method for every different template
          * arguments, thus the static variable `method` containing in those `invoke`
-         * methods are all diffesrent and will be instaniated by corresponding template
+         * methods are all different and will be instaniated by corresponding template
          * types, the `thread_local` specifier is to prevent locks being used */
         static thread_local Internal::MetaMethod<R, Args ...> method;
 
