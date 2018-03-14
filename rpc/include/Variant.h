@@ -203,6 +203,46 @@ public:
             throw Exceptions::TypeError(toString() + " is not an `int64_t`");
     }
 
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int8_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::Int8)
+            return static_cast<T>(_s8);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `int8_t`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int16_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::Int16)
+            return static_cast<T>(_s16);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `int16_t`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int32_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::Int32)
+            return static_cast<T>(_s32);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `int32_t`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int64_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::Int64)
+            return static_cast<T>(_s64);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `int64_t`");
+    }
+
 /** unsigned integers **/
 
 public:
@@ -245,6 +285,46 @@ public:
             throw Exceptions::TypeError(toString() + " is not an `uint64_t`");
     }
 
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint8_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::UInt8)
+            return static_cast<T>(_u8);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint8_t`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint16_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::UInt16)
+            return static_cast<T>(_u16);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint16_t`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint32_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::UInt32)
+            return static_cast<T>(_u32);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint32_t`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint64_t>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::UInt64)
+            return static_cast<T>(_u64);
+        else
+            throw Exceptions::TypeError(toString() + " is not an `uint64_t`");
+    }
+
 /** floating point numbers **/
 
 public:
@@ -252,7 +332,7 @@ public:
     inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, float>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::Float)
-            return _float;
+            return static_cast<T>(_float);
         else
             throw Exceptions::TypeError(toString() + " is not a `float`");
     }
@@ -262,7 +342,27 @@ public:
     inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, double>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::Double)
-            return _double;
+            return static_cast<T>(_double);
+        else
+            throw Exceptions::TypeError(toString() + " is not a `double`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<std::is_same<std::decay_t<T>, float>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::Float)
+            return static_cast<T>(_float);
+        else
+            throw Exceptions::TypeError(toString() + " is not a `float`");
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, double>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::Double)
+            return static_cast<T>(_double);
         else
             throw Exceptions::TypeError(toString() + " is not a `double`");
     }
@@ -274,7 +374,17 @@ public:
     inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, bool>::value, Tag> = Tag())
     {
         if (_type == Type::TypeCode::Boolean)
-            return _bool;
+            return static_cast<T>(_bool);
+        else
+            throw Exceptions::TypeError(toString() + " is not a `bool`");
+    }
+
+public:
+    template <typename T>
+    inline std::decay_t<T> get(std::enable_if_t<std::is_same<std::decay_t<T>, bool>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::Boolean)
+            return static_cast<T>(_bool);
         else
             throw Exceptions::TypeError(toString() + " is not a `bool`");
     }
@@ -291,11 +401,21 @@ public:
             throw Exceptions::TypeError(toString() + " is not a `std::string`");
     }
 
+public:
+    template <typename T>
+    inline const std::string &get(std::enable_if_t<std::is_same<std::decay_t<T>, std::string>::value, Tag> = Tag()) const
+    {
+        if (_type == Type::TypeCode::String)
+            return _string;
+        else
+            throw Exceptions::TypeError(toString() + " is not a `std::string`");
+    }
+
 /** Constant objects (arrays and objects) **/
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag()) const
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
@@ -307,12 +427,13 @@ public:
         for (const auto &item : _array)
             array.push_back(item->get<typename Internal::IsVector<T>::ItemType>());
 
+        /* move to prevent copy */
         return std::move(array);
     }
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag()) const
     {
         if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
@@ -329,7 +450,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsTypeWrapper<T>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsTypeWrapper<T>::value, Tag> = Tag()) const
     {
         /* let the compiler decide which override should be used */
         return T(getWrapped<typename T::Type>());
@@ -337,7 +458,7 @@ public:
 
 private:
     template <typename T>
-    inline std::shared_ptr<T> getWrapped(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag())
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag()) const
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
@@ -354,7 +475,7 @@ private:
 
 private:
     template <typename T>
-    inline std::shared_ptr<T> getWrapped(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag())
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag()) const
     {
         if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");

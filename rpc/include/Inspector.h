@@ -264,8 +264,8 @@ public:
                 },
                 [](const Field *field, void *self, const Variant &value)
                 {
-                    /* it's guaranteed that `Variant::get` would not modify the variant itself, so `const_cast` would be safe here */
-                    field->data<FieldType>(self) = const_cast<Variant &>(value).get<FieldType>();
+                    /* write the value directly back into field */
+                    field->data<FieldType>(self) = value.get<FieldType>();
                 }
             ))
         {
