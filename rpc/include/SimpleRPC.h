@@ -76,7 +76,7 @@ struct SerializableWrapper : public Serializable
 #define __SRPC_MEMBER_REFL_FUNC(type, elem)             ::SimpleRPC::Descriptor<type>::MemberData(BOOST_PP_STRINGIZE(BOOST_PP_SEQ_ELEM(2, elem)), __SRPC_METHOD_SIG_CAST(type, elem)),
 
 #define defineRaw(stmt)                                 (RAW)(stmt)
-#define defineField(type, name)                         (VAR)(name)(type name)
+#define defineField(type, name)                         (VAR)(name)(type name = type())
 #define declareMethod(ret, name, args)                  (FUNC)(ret)(name)(BOOST_PP_TUPLE_TO_SEQ(args))
 
 #endif /* SIMPLERPC_SERIALIZABLE_H */
