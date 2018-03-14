@@ -381,7 +381,7 @@ public:
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
-        else if (index < 0 || index >= _array.size())
+        else if (index < 0 || static_cast<size_t>(index) >= _array.size())
             throw Exceptions::IndexError(index);
         else
             return *_array[index].get();
@@ -392,7 +392,7 @@ public:
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
-        else if (index < 0 || index >= _array.size())
+        else if (index < 0 || static_cast<size_t>(index) >= _array.size())
             throw Exceptions::IndexError(index);
         else
             return *_array[index].get();

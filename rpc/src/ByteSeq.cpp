@@ -193,12 +193,12 @@ std::string ByteSeq::hexdump(const void *data, size_t size)
     char buffer[26] = {0};
     std::string result;
 
-    for (int i = 0, r = 0; r < (size / 16 + (size % 16 != 0)); r++, i += 16)
+    for (size_t i = 0, r = 0; r < (size / 16 + (size % 16 != 0)); r++, i += 16)
     {
-        snprintf(buffer, sizeof(buffer), "%08x | ", i);
+        snprintf(buffer, sizeof(buffer), "%08zu | ", i);
         result += buffer;
 
-        for (int c = i; c < i + 16; c++)
+        for (size_t c = i; c < i + 16; c++)
         {
             if (c >= size)
             {
@@ -213,7 +213,7 @@ std::string ByteSeq::hexdump(const void *data, size_t size)
             result += buffer;
         }
 
-        for (int c = i; c < i + 16; c++)
+        for (size_t c = i; c < i + 16; c++)
         {
             if (c == i)
                 result += " | ";
