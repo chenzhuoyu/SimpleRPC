@@ -129,7 +129,7 @@ template <typename T>
 struct TypeRef
 {
     typedef std::decay_t<T> U;
-    typedef std::conditional_t<IsVector<U>::value || std::is_convertible<U *, Serializable *>::value, TypeWrapper<U>, T> Type;
+    typedef std::conditional_t<IsMap<U>::value || IsVector<U>::value || std::is_convertible<U *, Serializable *>::value, TypeWrapper<U>, T> Type;
 };
 
 /****** Parameter tuple expanders ******/
@@ -140,7 +140,7 @@ struct ParamTupleImpl;
 template <size_t I, typename Item, typename ... Items>
 struct ParamTupleImpl<I, Item, Items ...>
 {
-    static std::tuple<Item, Items ...> expand(Variant &array)
+    static constexpr std::tuple<Item, Items ...> expand(Variant &array)
     {
         return std::tuple_cat(
             std::forward_as_tuple(array[I].get<Item>()),
@@ -152,7 +152,7 @@ struct ParamTupleImpl<I, Item, Items ...>
 template <size_t I>
 struct ParamTupleImpl<I>
 {
-    static std::tuple<> expand(Variant &)
+    static constexpr std::tuple<> expand(Variant &)
     {
         /* final recursion, no arguments left */
         return std::tuple<>();
@@ -203,6 +203,28 @@ struct ItemPatcher<I, std::vector<T> &>
     static void patch(Variant &array, U &item)
     {
         /* for arrays, simply assign back */
+        array[I] = std::move(*item);
+    }
+};
+
+template <size_t I, typename K, typename V>
+struct ItemPatcher<I, std::map<K, V> &>
+{
+    template <typename U>
+    static void patch(Variant &array, U &item)
+    {
+        /* for tree maps, simply assign back too */
+        array[I] = std::move(*item);
+    }
+};
+
+template <size_t I, typename K, typename V>
+struct ItemPatcher<I, std::unordered_map<K, V> &>
+{
+    template <typename U>
+    static void patch(Variant &array, U &item)
+    {
+        /* for hash maps, simply assign back too */
         array[I] = std::move(*item);
     }
 };
@@ -282,6 +304,7 @@ public:
                 {
                     /* wrapped argument types tuple */
                     typedef std::tuple<typename Internal::TypeRef<Args>::Type ...> Tuple;
+                    typedef Internal::Functional::MetaFunction<Variant, Result, T, Tuple, Args ...> MetaFunction;
 
                     /* check for parameters */
                     if (argv.type() != Type::TypeCode::Array)
@@ -291,7 +314,7 @@ public:
 
                     /* build arguments tuple and invoke target method through meta function wrapper */
                     auto tuple = Internal::ParamTuple<Args ...>::expand(argv);
-                    auto result = Internal::Functional::MetaFunction<Variant, Result, T, Tuple, Args ...>::invoke(static_cast<T *>(self), std::move(f), tuple);
+                    auto result = MetaFunction::invoke(static_cast<T *>(self), std::move(f), tuple);
 
                     /* patch mutable arguments back into `argv` */
                     Internal::BackPatcher<Tuple, Args ...>::patch(argv, std::move(tuple));

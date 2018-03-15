@@ -18,15 +18,35 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
     {
         /* positive fixint */
         case 0x00 ... 0x7f:
-            return (int8_t)(ch & 0x7f);
+            return static_cast<int8_t>(ch & 0x7f);
 
         /* nil */
         case 0xc0:
             return Variant();
 
-        /* (never used) */
+        /* reserved, but we uses it as object */
         case 0xc1:
-            throw Exceptions::DeserializerError("Reserved leading byte '\\xc1'");
+        {
+            /* make an object variant */
+            size_t n = data.nextBE<uint16_t>();
+            Variant result(Type::TypeCode::Object);
+
+            /* parse every entry */
+            while (n--)
+            {
+                Variant key   = doParse(data); /* odd elements in objects are keys of a map */
+                Variant value = doParse(data); /* the next element of a key is its associated value */
+
+                /* add to map */
+                result.internalObject().emplace(
+                    key.get<const std::string &>(),
+                    std::make_shared<Variant>(std::move(value))
+                );
+            }
+
+            /* move to prevent copy */
+            return std::move(result);
+        }
 
         /* false */
         case 0xc2:
@@ -133,7 +153,8 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
             while (n--)
                 result.internalArray().push_back(std::make_shared<Variant>(doParse(data)));
 
-            return result;
+            /* move to prevent copy */
+            return std::move(result);
         }
 
         /* map16/32 */
@@ -149,28 +170,28 @@ Variant MessagePackBackend::doParse(ByteSeq &data) const
                 static_cast<size_t>(ch & 0x0f);         /* fixmap */
 
             /* make an object variant */
-            Variant result(Type::TypeCode::Object);
+            Variant result(Type::TypeCode::Map);
 
+            /* parse every entry */
             while (n--)
             {
                 Variant key   = doParse(data); /* odd elements in objects are keys of a map */
                 Variant value = doParse(data); /* the next element of a key is its associated value */
 
-                if (key.type() != Type::TypeCode::String)
-                    throw Exceptions::DeserializerError("Keys of \"Object\" type must be strings");
-
-                result.internalObject().emplace(
-                    key.get<const std::string &>(),
+                /* add to map */
+                result.internalMap().emplace(
+                    VariantHashKey(std::move(key)),
                     std::make_shared<Variant>(std::move(value))
                 );
             }
 
-            return result;
+            /* move to prevent copy */
+            return std::move(result);
         }
 
         /* negative fixint */
         case 0xe0 ... 0xff:
-            return (int8_t)ch;
+            return static_cast<int8_t>(ch);
 
         default:
         {
@@ -205,7 +226,7 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
             }
 
             /* otherwise store as "int8" */
-            result.appendBE((uint8_t)0xcc);
+            result.appendBE((uint8_t)0xd0);
             result.appendBE(value);
             break;
         }
@@ -322,6 +343,41 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
             break;
         }
 
+        case Type::TypeCode::Map:
+        {
+            if (object.internalMap().size() <= 15)
+            {
+                /* fixmap */
+                result.appendBE(static_cast<uint8_t>(0x80 | object.internalMap().size()));
+            }
+            else if (object.internalMap().size() <= UINT16_MAX)
+            {
+                /* map16 */
+                result.appendBE((uint8_t)0xde);
+                result.appendBE(static_cast<uint16_t>(object.internalMap().size()));
+            }
+            else if (object.internalMap().size() <= UINT32_MAX)
+            {
+                /* map32 */
+                result.appendBE((uint8_t)0xdf);
+                result.appendBE(static_cast<uint32_t>(object.internalMap().size()));
+            }
+            else
+            {
+                /* object is too large */
+                throw Exceptions::SerializerError("Map is too large : " + std::to_string(object.internalMap().size()));
+            }
+
+            /* serialize each object */
+            for (const auto &item : object.internalMap())
+            {
+                result.append(doAssemble(*item.first.key));
+                result.append(doAssemble(*item.second));
+            }
+
+            break;
+        }
+
         case Type::TypeCode::Array:
         {
             if (object.internalArray().size() <= 15)
@@ -356,33 +412,18 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
 
         case Type::TypeCode::Object:
         {
-            if (object.internalObject().size() <= 15)
-            {
-                /* fixmap */
-                result.appendBE(static_cast<uint8_t>(0x80 | object.internalObject().size()));
-            }
-            else if (object.internalObject().size() <= UINT16_MAX)
-            {
-                /* map16 */
-                result.appendBE((uint8_t)0xde);
-                result.appendBE(static_cast<uint16_t>(object.internalObject().size()));
-            }
-            else if (object.internalObject().size() <= UINT32_MAX)
-            {
-                /* map32 */
-                result.appendBE((uint8_t)0xdf);
-                result.appendBE(static_cast<uint32_t>(object.internalObject().size()));
-            }
-            else
-            {
-                /* object is too large */
-                throw Exceptions::SerializerError("Object is too large : " + std::to_string(object.internalObject().size()));
-            }
+            /* at most 65536 fields */
+            if (object.internalObject().size() > UINT16_MAX)
+                throw Exceptions::SerializerError("Object has too many fields : " + std::to_string(object.internalArray().size()));
+
+            /* serialize as the reserved code */
+            result.appendBE((uint8_t)0xc1);
+            result.appendBE(static_cast<uint16_t>(object.internalObject().size()));
 
             /* serialize each object */
             for (const auto &item : object.internalObject())
             {
-                result.append(assemble(Variant(item.first)));
+                result.append(assemble(item.first));
                 result.append(doAssemble(*item.second));
             }
 
@@ -390,6 +431,7 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
         }
     }
 
+    /* move to prevent copy */
     return std::move(result);
 }
 

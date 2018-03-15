@@ -21,6 +21,23 @@
 
 namespace SimpleRPC
 {
+class Variant;
+struct VariantHashKey final
+{
+    std::shared_ptr<Variant> key;
+
+public:
+    VariantHashKey(Variant &&key) : key(std::make_shared<Variant>(key)) {}
+
+public:
+    bool operator==(const VariantHashKey &other) const;
+    bool operator!=(const VariantHashKey &other) const { return !(*this == other); }
+
+public:
+    struct Hash { size_t operator()(const VariantHashKey &key) const; };
+
+};
+
 class Variant final
 {
     union
@@ -58,20 +75,29 @@ class Variant final
 public:
     typedef std::vector<std::shared_ptr<Variant>> Array;
     typedef std::unordered_map<std::string, std::shared_ptr<Variant>> Object;
+    typedef std::unordered_map<VariantHashKey, std::shared_ptr<Variant>, VariantHashKey::Hash> Map;
 
 private:
+    Map _map;
     Array _array;
     Object _object;
     std::string _string;
 
+public:
+    enum class ArrayElementType
+    {
+        Int8,
+        UInt8,
+        Generic,
+    };
+
 private:
-    Type::TypeCode _type;
+    Type::TypeCode _type = Type::TypeCode::Void;
+    ArrayElementType _itemType = ArrayElementType::Generic;
 
 public:
+    explicit Variant() = default;
     explicit Variant(const Type::TypeCode &type) : _type(type) {}
-
-public:
-    Variant() : _type(Type::TypeCode::Void) {}
 
 public:
     Variant(int8_t  value) : _type(Type::TypeCode::Int8 ), _s8 (value) {}
@@ -106,17 +132,48 @@ public:
         /* append every item */
         for (const auto &item : value)
             _array.push_back(std::make_shared<Variant>(item));
+
+        /* check for element type, these `if` statements will be optimized compile time */
+        if (Internal::IsSignedIntegerLike<T, int8_t>::value)
+            _itemType = ArrayElementType::Int8;
+        else if (Internal::IsUnsignedIntegerLike<T, uint8_t>::value)
+            _itemType = ArrayElementType::UInt8;
+        else
+            _itemType = ArrayElementType::Generic;
     }
 
 public:
-    Variant(std::initializer_list<Variant> list) : _type(Type::TypeCode::Array)
+    template <typename K, typename V>
+    Variant(const std::map<K, V> &value) : _type(Type::TypeCode::Map)
     {
         /* reserve space to prevent frequent malloc */
-        _array.reserve(list.size());
+        _map.reserve(value.size());
 
         /* append every item */
-        for (auto &item : list)
-            _array.push_back(std::make_shared<Variant>(std::move(item)));
+        for (const auto &item : value)
+        {
+            _map.emplace(
+                VariantHashKey(Variant(item.first)),
+                std::make_shared<Variant>(item.second)
+            );
+        }
+    }
+
+public:
+    template <typename K, typename V>
+    Variant(const std::unordered_map<K, V> &value) : _type(Type::TypeCode::Map)
+    {
+        /* reserve space to prevent frequent malloc */
+        _map.reserve(value.size());
+
+        /* append every item */
+        for (const auto &item : value)
+        {
+            _map.emplace(
+                VariantHashKey(Variant(item.first)),
+                std::make_shared<Variant>(item.second)
+            );
+        }
     }
 
 public:
@@ -134,18 +191,21 @@ public:
 public:
     void swap(Variant &other)
     {
+        std::swap(_map, other._map);
         std::swap(_type, other._type);
         std::swap(_array, other._array);
         std::swap(_object, other._object);
         std::swap(_string, other._string);
 
-        /* no need to clear other's buffer, primitive types are harmless */
+        /* copy from other's buffer, then clear it */
         memcpy(_buffer, other._buffer, sizeof(_buffer));
+        memset(other._buffer, 0, sizeof(other._buffer));
     }
 
 public:
     void assign(const Variant &other)
     {
+        _map = other._map;
         _type = other._type;
         _array = other._array;
         _object = other._object;
@@ -157,15 +217,185 @@ public:
 
 public:
     Type::TypeCode type(void) const { return _type; }
+    ArrayElementType arrayElementType(void) const
+    {
+        if (_type != Type::TypeCode::Array)
+            throw Exceptions::TypeError(toString() + " is not an array");
+        else
+            return _itemType;
+    }
 
 private:
-    struct Tag {};
+    static inline size_t hashCombine(size_t seed, size_t value)
+    {
+        value += 0x9e3779b9;
+        value += seed << 6;
+        value += seed >> 2;
+        return seed ^ value;
+    }
+
+public:
+    size_t hash(void) const
+    {
+        /* hash of the type */
+        int type = static_cast<int>(_type);
+        size_t hash = std::hash<int>()(type);
+
+        /* hash the values */
+        switch (_type)
+        {
+            case Type::TypeCode::Void    : return hashCombine(hash, 0);
+            case Type::TypeCode::Int8    : return hashCombine(hash, std::hash<int8_t >()(_s8 ));
+            case Type::TypeCode::Int16   : return hashCombine(hash, std::hash<int16_t>()(_s16));
+            case Type::TypeCode::Int32   : return hashCombine(hash, std::hash<int32_t>()(_s32));
+            case Type::TypeCode::Int64   : return hashCombine(hash, std::hash<int64_t>()(_s64));
+
+            case Type::TypeCode::UInt8   : return hashCombine(hash, std::hash<uint8_t >()(_u8 ));
+            case Type::TypeCode::UInt16  : return hashCombine(hash, std::hash<uint16_t>()(_u16));
+            case Type::TypeCode::UInt32  : return hashCombine(hash, std::hash<uint32_t>()(_u32));
+            case Type::TypeCode::UInt64  : return hashCombine(hash, std::hash<uint64_t>()(_u64));
+
+            case Type::TypeCode::Float   : return hashCombine(hash, std::hash<float      >()(_float ));
+            case Type::TypeCode::Double  : return hashCombine(hash, std::hash<double     >()(_double));
+            case Type::TypeCode::String  : return hashCombine(hash, std::hash<std::string>()(_string));
+            case Type::TypeCode::Boolean : return hashCombine(hash, std::hash<bool       >()(_bool  ));
+
+            case Type::TypeCode::Map:
+            {
+                for (const auto &item : _map)
+                {
+                    hash = hashCombine(hash, item.second->hash());
+                    hash = hashCombine(hash, item.first.key->hash());
+                }
+
+                return hash;
+            }
+
+            case Type::TypeCode::Array:
+            {
+                for (const auto &item : _array)
+                    hash = hashCombine(hash, item->hash());
+
+                return hash;
+            }
+
+            case Type::TypeCode::Object:
+            {
+                for (const auto &item : _object)
+                {
+                    hash = hashCombine(hash, item.second->hash());
+                    hash = hashCombine(hash, std::hash<std::string>()(item.first));
+                }
+
+                return hash;
+            }
+        }
+    }
+
+public:
+    bool operator!=(const Variant &other) const { return !(*this == other); }
+    bool operator==(const Variant &other) const
+    {
+        /* must be the same type */
+        if (_type != other._type)
+            return false;
+
+        /* and the same value */
+        switch (_type)
+        {
+            case Type::TypeCode::Void    : return true;
+            case Type::TypeCode::Int8    : return _s8  == other._s8 ;
+            case Type::TypeCode::Int16   : return _s16 == other._s16;
+            case Type::TypeCode::Int32   : return _s32 == other._s32;
+            case Type::TypeCode::Int64   : return _s64 == other._s64;
+            case Type::TypeCode::UInt8   : return _u8  == other._u8 ;
+            case Type::TypeCode::UInt16  : return _u16 == other._u16;
+            case Type::TypeCode::UInt32  : return _u32 == other._u32;
+            case Type::TypeCode::UInt64  : return _u64 == other._u64;
+
+            case Type::TypeCode::Float   : return _float  == other._float;
+            case Type::TypeCode::Double  : return _double == other._double;
+            case Type::TypeCode::String  : return _string == other._string;
+            case Type::TypeCode::Boolean : return _bool   == other._bool;
+
+            case Type::TypeCode::Map:
+            {
+                /* check the map size */
+                if (_map.size() != other._map.size())
+                    return false;
+
+                /* compare each item */
+                for (const auto &item : _map)
+                {
+                    /* locate in `other` map */
+                    auto iter = other._map.find(item.first);
+
+                    /* check for existance */
+                    if (iter == other._map.end())
+                        return false;
+
+                    /* check for value */
+                    if (*iter->second != *item.second)
+                        return false;
+                }
+
+                /* all equals, then the two maps equals */
+                return true;
+            }
+
+            case Type::TypeCode::Array:
+            {
+                /* check the array size */
+                if (_array.size() != other._array.size())
+                    return false;
+
+                /* compare each item */
+                for (auto x = _array.begin(), y = other._array.begin(); (x != _array.end()) && (y != other._array.end()); x++, y++)
+                    if (**x != **y)
+                        return false;
+
+                /* all equals, then the two maps equals */
+                return true;
+            }
+
+            case Type::TypeCode::Object:
+            {
+                /* check the object field count */
+                if (_object.size() != other._object.size())
+                    return false;
+
+                /* compare each field */
+                for (const auto &item : _object)
+                {
+                    /* locate in `other` object fields */
+                    auto iter = other._object.find(item.first);
+
+                    /* check for existance */
+                    if (iter == other._object.end())
+                        return false;
+
+                    /* check for value */
+                    if (*iter->second != *item.second)
+                        return false;
+                }
+
+                /* all equals, then the two maps equals */
+                return true;
+            }
+        }
+    }
 
 /** signed integers **/
 
+private:
+    struct TagInt8 {};
+    struct TagInt16 {};
+    struct TagInt32 {};
+    struct TagInt64 {};
+
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int8_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int8_t>::value, TagInt8> = TagInt8())
     {
         if (_type == Type::TypeCode::Int8)
             return static_cast<T>(_s8);
@@ -175,7 +405,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int16_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int16_t>::value, TagInt16> = TagInt16())
     {
         if (_type == Type::TypeCode::Int16)
             return static_cast<T>(_s16);
@@ -185,7 +415,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int32_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int32_t>::value, TagInt32> = TagInt32())
     {
         if (_type == Type::TypeCode::Int32)
             return static_cast<T>(_s32);
@@ -195,7 +425,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int64_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int64_t>::value, TagInt64> = TagInt64())
     {
         if (_type == Type::TypeCode::Int64)
             return static_cast<T>(_s64);
@@ -205,7 +435,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int8_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int8_t>::value, TagInt8> = TagInt8()) const
     {
         if (_type == Type::TypeCode::Int8)
             return static_cast<T>(_s8);
@@ -215,7 +445,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int16_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int16_t>::value, TagInt16> = TagInt16()) const
     {
         if (_type == Type::TypeCode::Int16)
             return static_cast<T>(_s16);
@@ -225,7 +455,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int32_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int32_t>::value, TagInt32> = TagInt32()) const
     {
         if (_type == Type::TypeCode::Int32)
             return static_cast<T>(_s32);
@@ -235,7 +465,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int64_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsSignedIntegerLike<T, int64_t>::value, TagInt64> = TagInt64()) const
     {
         if (_type == Type::TypeCode::Int64)
             return static_cast<T>(_s64);
@@ -245,9 +475,15 @@ public:
 
 /** unsigned integers **/
 
+private:
+    struct TagUInt8 {};
+    struct TagUInt16 {};
+    struct TagUInt32 {};
+    struct TagUInt64 {};
+
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint8_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint8_t>::value, TagUInt8> = TagUInt8())
     {
         if (_type == Type::TypeCode::UInt8)
             return static_cast<T>(_u8);
@@ -257,7 +493,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint16_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint16_t>::value, TagUInt16> = TagUInt16())
     {
         if (_type == Type::TypeCode::UInt16)
             return static_cast<T>(_u16);
@@ -267,7 +503,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint32_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint32_t>::value, TagUInt32> = TagUInt32())
     {
         if (_type == Type::TypeCode::UInt32)
             return static_cast<T>(_u32);
@@ -277,7 +513,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint64_t>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint64_t>::value, TagUInt64> = TagUInt64())
     {
         if (_type == Type::TypeCode::UInt64)
             return static_cast<T>(_u64);
@@ -287,7 +523,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint8_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint8_t>::value, TagUInt8> = TagUInt8()) const
     {
         if (_type == Type::TypeCode::UInt8)
             return static_cast<T>(_u8);
@@ -297,7 +533,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint16_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint16_t>::value, TagUInt16> = TagUInt16()) const
     {
         if (_type == Type::TypeCode::UInt16)
             return static_cast<T>(_u16);
@@ -307,7 +543,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint32_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint32_t>::value, TagUInt32> = TagUInt32()) const
     {
         if (_type == Type::TypeCode::UInt32)
             return static_cast<T>(_u32);
@@ -317,7 +553,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint64_t>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<Internal::IsUnsignedIntegerLike<T, uint64_t>::value, TagUInt64> = TagUInt64()) const
     {
         if (_type == Type::TypeCode::UInt64)
             return static_cast<T>(_u64);
@@ -327,9 +563,13 @@ public:
 
 /** floating point numbers **/
 
+private:
+    struct TagFloat {};
+    struct TagDouble {};
+
 public:
     template <typename T>
-    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, float>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, float>::value, TagFloat> = TagFloat())
     {
         if (_type == Type::TypeCode::Float)
             return static_cast<T>(_float);
@@ -339,7 +579,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, double>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, double>::value, TagDouble> = TagDouble())
     {
         if (_type == Type::TypeCode::Double)
             return static_cast<T>(_double);
@@ -349,7 +589,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<std::is_same<std::decay_t<T>, float>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<std::is_same<std::decay_t<T>, float>::value, TagFloat> = TagFloat()) const
     {
         if (_type == Type::TypeCode::Float)
             return static_cast<T>(_float);
@@ -359,7 +599,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, double>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<std::is_same<std::decay_t<T>, double>::value, TagDouble> = TagDouble()) const
     {
         if (_type == Type::TypeCode::Double)
             return static_cast<T>(_double);
@@ -369,9 +609,12 @@ public:
 
 /** boolean **/
 
+private:
+    struct TagBoolean {};
+
 public:
     template <typename T>
-    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, bool>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, bool>::value, TagBoolean> = TagBoolean())
     {
         if (_type == Type::TypeCode::Boolean)
             return static_cast<T>(_bool);
@@ -381,7 +624,7 @@ public:
 
 public:
     template <typename T>
-    inline std::decay_t<T> get(std::enable_if_t<std::is_same<std::decay_t<T>, bool>::value, Tag> = Tag()) const
+    inline std::decay_t<T> get(std::enable_if_t<std::is_same<std::decay_t<T>, bool>::value, TagBoolean> = TagBoolean()) const
     {
         if (_type == Type::TypeCode::Boolean)
             return static_cast<T>(_bool);
@@ -391,9 +634,12 @@ public:
 
 /** STL string **/
 
+private:
+    struct TagString {};
+
 public:
     template <typename T>
-    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, std::string>::value, Tag> = Tag())
+    inline T get(std::enable_if_t<std::is_same<std::decay_t<T>, std::string>::value, TagString> = TagString())
     {
         if (_type == Type::TypeCode::String)
             return _string;
@@ -403,7 +649,7 @@ public:
 
 public:
     template <typename T>
-    inline const std::string &get(std::enable_if_t<std::is_same<std::decay_t<T>, std::string>::value, Tag> = Tag()) const
+    inline const std::string &get(std::enable_if_t<std::is_same<std::decay_t<T>, std::string>::value, TagString> = TagString()) const
     {
         if (_type == Type::TypeCode::String)
             return _string;
@@ -411,11 +657,39 @@ public:
             throw Exceptions::TypeError(toString() + " is not a `std::string`");
     }
 
-/** Constant objects (arrays and objects) **/
+/** Constant objects (maps, arrays and objects) **/
+
+private:
+    struct TagCMap {};
+    struct TagCArray {};
+    struct TagCObject {};
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag()) const
+    inline T get(std::enable_if_t<Internal::IsMap<T>::value, TagCMap> = TagCMap()) const
+    {
+        if (_type != Type::TypeCode::Map)
+            throw Exceptions::TypeError(toString() + " is not a map");
+
+        /* create result map */
+        T map;
+
+        /* fill each item */
+        for (const auto &item : _map)
+        {
+            map.emplace(
+                item.first.key->get<typename Internal::IsMap<T>::KeyType>(),
+                item.second->get<typename Internal::IsMap<T>::ValueType>()
+            );
+        }
+
+        /* move to prevent copy */
+        return std::move(map);
+    }
+
+public:
+    template <typename T>
+    inline T get(std::enable_if_t<Internal::IsVector<T>::value, TagCArray> = TagCArray()) const
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
@@ -433,7 +707,7 @@ public:
 
 public:
     template <typename T>
-    inline T get(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag()) const
+    inline T get(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, TagCObject> = TagCObject()) const
     {
         if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
@@ -448,9 +722,15 @@ public:
 
 /** Wrapped objects (arrays and objects) **/
 
+private:
+    struct TagWMap {};
+    struct TagWType {};
+    struct TagWArray {};
+    struct TagWObject {};
+
 public:
     template <typename T>
-    inline T get(std::enable_if_t<Internal::IsTypeWrapper<T>::value, Tag> = Tag()) const
+    inline T get(std::enable_if_t<Internal::IsTypeWrapper<T>::value, TagWType> = TagWType()) const
     {
         /* let the compiler decide which override should be used */
         return T(getWrapped<typename T::Type>());
@@ -458,7 +738,30 @@ public:
 
 private:
     template <typename T>
-    inline std::shared_ptr<T> getWrapped(std::enable_if_t<Internal::IsVector<T>::value, Tag> = Tag()) const
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<Internal::IsMap<T>::value, TagWMap> = TagWMap()) const
+    {
+        if (_type != Type::TypeCode::Map)
+            throw Exceptions::TypeError(toString() + " is not a map");
+
+        /* create result map */
+        std::shared_ptr<T> map(new T);
+
+        /* fill each item */
+        for (const auto &item : _map)
+        {
+            map->emplace(
+                item.first.key->get<typename Internal::IsMap<T>::KeyType>(),
+                item.second->get<typename Internal::IsMap<T>::ValueType>()
+            );
+        }
+
+        /* move to prevent copy */
+        return std::move(map);
+    }
+
+private:
+    template <typename T>
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<Internal::IsVector<T>::value, TagWArray> = TagWArray()) const
     {
         if (_type != Type::TypeCode::Array)
             throw Exceptions::TypeError(toString() + " is not an array");
@@ -470,12 +773,13 @@ private:
         for (const auto &item : _array)
             array->push_back(item->get<typename Internal::IsVector<T>::ItemType>());
 
+        /* move to prevent copy */
         return std::move(array);
     }
 
 private:
     template <typename T>
-    inline std::shared_ptr<T> getWrapped(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, Tag> = Tag()) const
+    inline std::shared_ptr<T> getWrapped(std::enable_if_t<std::is_convertible<T *, Serializable *>::value, TagWObject> = TagWObject()) const
     {
         if (_type != Type::TypeCode::Object)
             throw Exceptions::TypeError(toString() + " is not an object");
@@ -545,10 +849,12 @@ public:
 /** BEGIN :: these methods should only be used by serialization / deserialization backends unless you know what you are doing **/
 
 public:
+    Map &internalMap(void) { return _map; }
     Array &internalArray(void) { return _array; }
     Object &internalObject(void) { return _object; }
 
 public:
+    const Map &internalMap(void) const { return _map; }
     const Array &internalArray(void) const { return _array; }
     const Object &internalObject(void) const { return _object; }
 
@@ -645,6 +951,24 @@ public:
             /* STL string */
             case Type::TypeCode::String     : return ByteSeq::repr(_string);
 
+            /* maps */
+            case Type::TypeCode::Map:
+            {
+                std::string result;
+
+                for (const auto &item : _map)
+                {
+                    if (!result.empty())
+                        result += ", ";
+
+                    result += item.first.key->toString();
+                    result += ": ";
+                    result += item.second->toString();
+                }
+
+                return "{" + result + "}";
+            }
+
             /* arrays */
             case Type::TypeCode::Array:
             {
@@ -676,13 +1000,27 @@ public:
                     result += item.second->toString();
                 }
 
-                return "{" + result + "}";
+                return "<" + result + ">";
             }
         }
     }
 };
 
-/* specification must be placed out-side of the class */
+/* variant key comparator */
+inline bool VariantHashKey::operator==(const VariantHashKey &other) const
+{
+    /* forward to variant comparison function */
+    return *key == *(other.key);
+}
+
+/* hash function for variant key */
+inline size_t VariantHashKey::Hash::operator()(const VariantHashKey &key) const
+{
+    /* forward to variant hash function */
+    return key.key->hash();
+}
+
+/* speciallizations must be placed out-side of the class */
 template <>
 struct Variant::ArrayBuilder<>
 {

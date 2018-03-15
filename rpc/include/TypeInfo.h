@@ -3,9 +3,11 @@
 #ifndef SIMPLERPC_TYPEINFO_H
 #define SIMPLERPC_TYPEINFO_H
 
+#include <map>
 #include <string>
 #include <memory>
 #include <algorithm>
+#include <unordered_map>
 
 #include "Registry.h"
 #include "Exceptions.h"
@@ -19,7 +21,8 @@ class Type final
 {
     bool _isMutable;
     std::string _className;
-    std::shared_ptr<Type> _itemType;
+    std::shared_ptr<Type> _keyType;
+    std::shared_ptr<Type> _valueType;
 
 public:
     enum class TypeCode : int
@@ -50,6 +53,7 @@ public:
         String,
 
         /* compond types */
+        Map,
         Array,
         Object
     };
@@ -65,21 +69,45 @@ public:
     /* primitive types */
     explicit Type(TypeCode typeCode, bool isMutable) : _typeCode(typeCode), _isMutable(isMutable)
     {
-        if (typeCode == TypeCode::Array || typeCode == TypeCode::Object)
+        if (typeCode == TypeCode::Map || typeCode == TypeCode::Array || typeCode == TypeCode::Object)
         {
-            fprintf(stderr, "assert_failed(): typeCode != TypeCode::Array && typeCode != TypeCode::Object");
+            fprintf(stderr, "assert_failed(): typeCode != TypeCode::Map && typeCode != TypeCode::Array && typeCode != TypeCode::Object");
+            abort();
+        }
+    }
+
+public:
+    /* map key-value type */
+    explicit Type(TypeCode typeCode, Type &&keyType, Type &&valueType, bool isMutable) :
+        _typeCode(TypeCode::Map), _keyType(new Type(std::move(keyType))), _valueType(new Type(std::move(valueType))), _isMutable(isMutable)
+    {
+        if (keyType.isMutable())
+        {
+            fprintf(stderr, "assert_failed(): !keyType.isMutable()");
+            abort();
+        }
+
+        if (valueType.isMutable())
+        {
+            fprintf(stderr, "assert_failed(): !valueType.isMutable()");
+            abort();
+        }
+
+        if (typeCode != TypeCode::Map)
+        {
+            fprintf(stderr, "assert_failed(): typeCode == TypeCode::Map");
             abort();
         }
     }
 
 public:
     /* array sub-item type */
-    explicit Type(TypeCode typeCode, Type &&itemType, bool isMutable) :
-        _typeCode(TypeCode::Array), _itemType(new Type(std::move(itemType))), _isMutable(isMutable)
+    explicit Type(TypeCode typeCode, Type &&valueType, bool isMutable) :
+        _typeCode(TypeCode::Array), _valueType(new Type(std::move(valueType))), _isMutable(isMutable)
     {
-        if (itemType.isMutable())
+        if (valueType.isMutable())
         {
-            fprintf(stderr, "assert_failed(): !itemType.isMutable()");
+            fprintf(stderr, "assert_failed(): !valueType.isMutable()");
             abort();
         }
 
@@ -108,12 +136,53 @@ public:
     const std::string &className(void) const { return _className; }
 
 public:
-    const Type &itemType(void) const
+    bool operator!=(const Type &other) const { return !(*this == other); }
+    bool operator==(const Type &other) const
     {
-        if (_typeCode == TypeCode::Array)
-            return *_itemType;
+        switch (_typeCode)
+        {
+            case TypeCode::Void:
+            case TypeCode::Int8:
+            case TypeCode::Int16:
+            case TypeCode::Int32:
+            case TypeCode::Int64:
+            case TypeCode::UInt8:
+            case TypeCode::UInt16:
+            case TypeCode::UInt32:
+            case TypeCode::UInt64:
+            case TypeCode::Float:
+            case TypeCode::Double:
+            case TypeCode::String:
+            case TypeCode::Boolean:
+                return _typeCode == other._typeCode;
+
+            case TypeCode::Map:
+                return (other._typeCode == TypeCode::Map) && (_keyType == other._keyType) && (_valueType == other._valueType);
+
+            case TypeCode::Array:
+                return (other._typeCode == TypeCode::Array) && (_valueType == other._valueType);
+
+            case TypeCode::Object:
+                return (other._typeCode == TypeCode::Object) && (_className == other._className);
+        }
+    }
+
+public:
+    const Type &keyType(void) const
+    {
+        if (_typeCode == TypeCode::Map)
+            return *_keyType;
         else
-            throw Exceptions::TypeError("Only arrays have sub-items");
+            throw Exceptions::TypeError("Only maps may have keys");
+    }
+
+public:
+    const Type &valueType(void) const
+    {
+        if (_typeCode == TypeCode::Map || _typeCode == TypeCode::Array)
+            return *_valueType;
+        else
+            throw Exceptions::TypeError("Only maps or arrays may have values");
     }
 
 public:
@@ -139,8 +208,10 @@ public:
 
                 case TypeCode::Void     : return "v";
                 case TypeCode::String   : return "s";
-                case TypeCode::Object   : return "{" + _className + "}";
-                case TypeCode::Array    : return "[" + _itemType->toSignature() + "]";
+                case TypeCode::Object   : return "<" + _className + ">";
+
+                case TypeCode::Map      : return "{" + _keyType->toSignature() + ":" + _valueType->toSignature() + "}";
+                case TypeCode::Array    : return "[" + _valueType->toSignature() + "]";
             }
         }
         else
@@ -162,8 +233,10 @@ public:
                 case TypeCode::Boolean  : return "?&";
 
                 case TypeCode::String   : return "s&";
-                case TypeCode::Object   : return "{" + _className + "}&";
-                case TypeCode::Array    : return "[" + _itemType->toSignature() + "]&";
+                case TypeCode::Object   : return "<" + _className + ">&";
+
+                case TypeCode::Map      : return "{" + _keyType->toSignature() + ":" + _valueType->toSignature() + "}&";
+                case TypeCode::Array    : return "[" + _valueType->toSignature() + "]&";
 
                 case TypeCode::Void:
                     throw std::range_error("`void` should always be immutable");
@@ -304,6 +377,16 @@ template <typename Item> struct TypeItem<      std::vector<Item>  > { static Typ
 template <typename Item> struct TypeItem<      std::vector<Item> &> { static Type type(void) { return Type(Type::TypeCode::Array, TypeItem<Item>::type(), true ); }};
 template <typename Item> struct TypeItem<const std::vector<Item> &> { static Type type(void) { return Type(Type::TypeCode::Array, TypeItem<Item>::type(), false); }};
 
+/* STL tree maps (maps) */
+template <typename Key, typename Value> struct TypeItem<      std::map<Key, Value>  > { static Type type(void) { return Type(Type::TypeCode::Map, TypeItem<Key>::type(), TypeItem<Value>::type(), false); }};
+template <typename Key, typename Value> struct TypeItem<      std::map<Key, Value> &> { static Type type(void) { return Type(Type::TypeCode::Map, TypeItem<Key>::type(), TypeItem<Value>::type(), true ); }};
+template <typename Key, typename Value> struct TypeItem<const std::map<Key, Value> &> { static Type type(void) { return Type(Type::TypeCode::Map, TypeItem<Key>::type(), TypeItem<Value>::type(), false); }};
+
+/* STL unordered maps (maps) */
+template <typename Key, typename Value> struct TypeItem<      std::unordered_map<Key, Value>  > { static Type type(void) { return Type(Type::TypeCode::Map, TypeItem<Key>::type(), TypeItem<Value>::type(), false); }};
+template <typename Key, typename Value> struct TypeItem<      std::unordered_map<Key, Value> &> { static Type type(void) { return Type(Type::TypeCode::Map, TypeItem<Key>::type(), TypeItem<Value>::type(), true ); }};
+template <typename Key, typename Value> struct TypeItem<const std::unordered_map<Key, Value> &> { static Type type(void) { return Type(Type::TypeCode::Map, TypeItem<Key>::type(), TypeItem<Value>::type(), false); }};
+
 /****** Type array resolvers ******/
 
 template <typename ... Items>
@@ -376,6 +459,10 @@ public:
 
 template <typename T> struct IsVector                 : public std::false_type {};
 template <typename T> struct IsVector<std::vector<T>> : public std::true_type  { typedef T ItemType; };
+
+template <typename T>             struct IsMap                           : public std::false_type {};
+template <typename K, typename V> struct IsMap<std::map<K, V>>           : public std::true_type  { typedef K KeyType; typedef V ValueType; };
+template <typename K, typename V> struct IsMap<std::unordered_map<K, V>> : public std::true_type  { typedef K KeyType; typedef V ValueType; };
 
 template <typename T>
 struct IsObjectReference
