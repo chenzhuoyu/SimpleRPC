@@ -795,7 +795,9 @@ private:
 public:
     size_t size(void) const
     {
-        if (_type == Type::TypeCode::Array)
+        if (_type == Type::TypeCode::Map)
+            return _map.size();
+        else if (_type == Type::TypeCode::Array)
             return _array.size();
         else
             throw Exceptions::TypeError(toString() + " is not an array");
@@ -821,29 +823,6 @@ public:
             throw Exceptions::IndexError(index);
         else
             return *_array[index].get();
-    }
-
-public:
-    Variant &operator[](const std::string &key)
-    {
-        if (_type != Type::TypeCode::Object)
-            throw Exceptions::TypeError(toString() + " is not an object");
-        else if (_object.find(key) == _object.end())
-            _object.emplace(key, std::make_shared<Variant>(0));
-
-        /* guaranted we have this key */
-        return *_object.at(key);
-    }
-
-public:
-    const Variant &operator[](const std::string &key) const
-    {
-        if (_type != Type::TypeCode::Object)
-            throw Exceptions::TypeError(toString() + " is not an object");
-        else if (_object.find(key) == _object.end())
-            throw Exceptions::NameError(key);
-        else
-            return *_object.at(key);
     }
 
 /** BEGIN :: these methods should only be used by serialization / deserialization backends unless you know what you are doing **/

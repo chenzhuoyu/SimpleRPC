@@ -26,12 +26,14 @@ Variant Serializable::serialize(void) const
 {
     /* create object type */
     Variant result(Type::TypeCode::Object);
+    Variant::Object &fields = result.internalObject();
 
     /* serialize each field */
     for (const auto &field : _meta->fields())
-        result[field.first] = field.second->serialize(this);
+        fields.emplace(field.first, std::make_shared<Variant>(field.second->serialize(this)));
 
-    return result;
+    /* move to prevent copy */
+    return std::move(result);
 }
 
 void Serializable::deserialize(Variant &&value)
