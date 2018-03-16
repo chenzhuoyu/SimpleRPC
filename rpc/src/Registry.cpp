@@ -14,7 +14,7 @@ void Registry::addClass(std::shared_ptr<Registry::Meta> &&meta)
         _registry.emplace(meta->name(), std::move(meta));
 }
 
-const Registry::Meta &Registry::findClass(const std::string &name)
+Registry::MetaClass Registry::findClass(const std::string &name)
 {
     if (_registry.find(name) != _registry.end())
         return *_registry.at(name);

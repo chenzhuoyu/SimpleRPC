@@ -16,10 +16,18 @@
 namespace SimpleRPC
 {
 template <typename T>
+static const Registry::Meta &metaClassOf(void)
+{
+    /* find meta data in class registry */
+    static const Registry::Meta &meta = Registry::findClass(Internal::TypeItem<T>::type().toSignature());
+    return meta;
+}
+
+template <typename T>
 struct SerializableWrapper : public Serializable
 {
-    explicit SerializableWrapper() :
-        Serializable(Registry::findClass(Internal::TypeItem<T>::type().toSignature())) {}
+    /* automatically initialize the class meta data */
+    explicit SerializableWrapper() : Serializable(metaClassOf<T>()) {}
 };
 }
 

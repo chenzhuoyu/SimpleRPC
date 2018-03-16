@@ -74,6 +74,10 @@ struct Registry
         }
     };
 
+public:
+    typedef const Meta *MetaPtr;
+    typedef const Meta &MetaClass;
+
 private:
     Registry() = delete;
     ~Registry() = delete;
@@ -84,7 +88,7 @@ private:
 
 public:
     static void addClass(std::shared_ptr<Meta> &&meta);
-    static const Meta &findClass(const std::string &name);
+    static MetaClass findClass(const std::string &name);
 
 };
 
@@ -94,18 +98,20 @@ class Variant;
 struct Serializable
 {
     typedef Registry::Meta Meta;
+    typedef Registry::MetaPtr MetaPtr;
+    typedef Registry::MetaClass MetaClass;
 
 private:
-    const Meta *_meta;
+    MetaPtr _meta;
 
 public:
     virtual ~Serializable() {}
 
 protected:
-    explicit Serializable(const Meta &meta) : _meta(&meta) {}
+    explicit Serializable(MetaClass meta) : _meta(&meta) {}
 
 public:
-    const Meta &meta(void) const { return *_meta; }
+    MetaClass meta(void) const { return *_meta; }
 
 public:
     Variant serialize(void) const;
