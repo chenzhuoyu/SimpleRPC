@@ -58,13 +58,14 @@ struct SerializableWrapper : public Serializable
 
 #define __SRPC_PROXY_DECL_RAW(type, elem)
 #define __SRPC_PROXY_DECL_VAR(type, elem)
-#define __SRPC_PROXY_DECL_FUNC(type, elem)                                                          \
-    BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (__SRPC_PROXY_ARG_LIST(elem))             \
-    {                                                                                               \
-        return ::SimpleRPC::Network::InvokeProxyAdapter<type>::invoke<BOOST_PP_SEQ_ELEM(1, elem)>(  \
-            BOOST_PP_STRINGIZE(BOOST_PP_SEQ_ELEM(2, elem)),                                         \
-            __SRPC_PROXY_CALL_LIST(elem)                                                            \
-        );                                                                                          \
+#define __SRPC_PROXY_DECL_FUNC(type, elem)                                                                      \
+    BOOST_PP_SEQ_ELEM(1, elem) BOOST_PP_SEQ_ELEM(2, elem) (__SRPC_PROXY_ARG_LIST(elem))                         \
+    {                                                                                                           \
+        return ::SimpleRPC::Network::InvokeProxyAdapter<type>::invoke<BOOST_PP_SEQ_ELEM(1, elem)> BOOST_PP_IF(  \
+            BOOST_PP_IS_EMPTY(BOOST_PP_SEQ_HEAD(BOOST_PP_SEQ_ELEM(3, elem))),                                   \
+            (BOOST_PP_STRINGIZE(BOOST_PP_SEQ_ELEM(2, elem))),                                                   \
+            (BOOST_PP_STRINGIZE(BOOST_PP_SEQ_ELEM(2, elem)), __SRPC_PROXY_CALL_LIST(elem))                      \
+        );                                                                                                      \
     }
 
 #define __SRPC_MEMBER_DECL_RAW(type, elem)              BOOST_PP_SEQ_ELEM(1, elem)
