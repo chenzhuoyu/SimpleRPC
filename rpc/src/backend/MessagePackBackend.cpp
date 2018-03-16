@@ -262,21 +262,21 @@ ByteSeq MessagePackBackend::doAssemble(Variant &object) const
         case Type::TypeCode::UInt16:
         {
             result.appendBE((uint8_t)0xcd);
-            result.appendBE(object.get<uint8_t>());
+            result.appendBE(object.get<uint16_t>());
             break;
         }
 
         case Type::TypeCode::UInt32:
         {
             result.appendBE((uint8_t)0xce);
-            result.appendBE(object.get<uint8_t>());
+            result.appendBE(object.get<uint32_t>());
             break;
         }
 
         case Type::TypeCode::UInt64:
         {
             result.appendBE((uint8_t)0xcf);
-            result.appendBE(object.get<uint8_t>());
+            result.appendBE(object.get<uint64_t>());
             break;
         }
 
