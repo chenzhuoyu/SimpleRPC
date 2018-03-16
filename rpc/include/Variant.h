@@ -330,7 +330,7 @@ public:
                     /* locate in `other` map */
                     auto iter = other._map.find(item.first);
 
-                    /* check for existance */
+                    /* check for existence */
                     if (iter == other._map.end())
                         return false;
 
@@ -370,7 +370,7 @@ public:
                     /* locate in `other` object fields */
                     auto iter = other._object.find(item.first);
 
-                    /* check for existance */
+                    /* check for existence */
                     if (iter == other._object.end())
                         return false;
 
