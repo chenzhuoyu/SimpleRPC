@@ -6,18 +6,22 @@
 namespace SimpleRPC
 {
 /* class factory registry */
-static std::unordered_map<std::string, std::shared_ptr<Registry::Meta>> _registry;
+static inline std::unordered_map<std::string, std::shared_ptr<Registry::Meta>> &registry(void)
+{
+    static std::unordered_map<std::string, std::shared_ptr<Registry::Meta>> instance;
+    return instance;
+}
 
 void Registry::addClass(std::shared_ptr<Registry::Meta> &&meta)
 {
-    if (_registry.find(meta->name()) == _registry.end())
-        _registry.emplace(meta->name(), std::move(meta));
+    if (registry().find(meta->name()) == registry().end())
+        registry().emplace(meta->name(), std::move(meta));
 }
 
 Registry::MetaClass Registry::findClass(const std::string &name)
 {
-    if (_registry.find(name) != _registry.end())
-        return *_registry.at(name);
+    if (registry().find(name) != registry().end())
+        return *registry().at(name);
     else
         throw Exceptions::ClassNotFoundError(name);
 }
