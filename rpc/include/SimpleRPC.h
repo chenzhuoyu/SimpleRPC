@@ -16,10 +16,10 @@
 namespace SimpleRPC
 {
 template <typename T>
-static const Registry::Meta &metaClassOf(void)
+static Registry::MetaClass metaClassOf(void)
 {
     /* find meta data in class registry */
-    static const Registry::Meta &meta = Registry::findClass(Internal::TypeItem<T>::type().toSignature());
+    static Registry::MetaClass meta = Registry::findClass(Internal::TypeItem<T>::type().toSignature());
     return meta;
 }
 
