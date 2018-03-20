@@ -74,8 +74,18 @@ struct Backend final
     };
 
 private:
-    static std::shared_ptr<BackendProxy> _defaultBackend;
-    static std::unordered_map<std::string, std::shared_ptr<BackendProxy>> _backends;
+    static std::shared_ptr<BackendProxy> &defaultBackendPtr(void)
+    {
+        static std::shared_ptr<BackendProxy> instance;
+        return instance;
+    }
+
+private:
+    static std::unordered_map<std::string, std::shared_ptr<BackendProxy>> &backendsMap(void)
+    {
+        static std::unordered_map<std::string, std::shared_ptr<BackendProxy>> instance;
+        return instance;
+    }
 
 #pragma clang diagnostic push
 #pragma ide diagnostic ignored "OCSimplifyInspection"
@@ -92,18 +102,18 @@ public:
         );
 
         /* check for backend existence */
-        if (_backends.find(name) != _backends.end())
+        if (backendsMap().find(name) != backendsMap().end())
             throw Exceptions::BackendDuplicatedError(name);
 
         /* build backend proxy and add to registry */
-        auto iter = _backends.emplace(name, std::make_shared<BackendProxy>(
+        auto iter = backendsMap().emplace(name, std::make_shared<BackendProxy>(
             [=](ByteSeq &&data) { return backend->parse(std::move(data)); },
             [=](Variant &&data) { return backend->assemble(std::move(data)); }
         ));
 
         /* set as default backend if not specified */
-        if (_defaultBackend == nullptr)
-            _defaultBackend = iter.first->second;
+        if (defaultBackendPtr() == nullptr)
+            defaultBackendPtr() = iter.first->second;
     }
 
 #pragma clang diagnostic pop
@@ -111,8 +121,8 @@ public:
 public:
     static const std::shared_ptr<BackendProxy> &findBackend(const std::string &name)
     {
-        if (_backends.find(name) != _backends.end())
-            return _backends.at(name);
+        if (backendsMap().find(name) != backendsMap().end())
+            return backendsMap().at(name);
         else
             throw Exceptions::BackendNotFoundError(name);
     }
@@ -120,8 +130,8 @@ public:
 public:
     static const std::shared_ptr<BackendProxy> &defaultBackend(void)
     {
-        if  (_defaultBackend != nullptr)
-            return _defaultBackend;
+        if  (defaultBackendPtr() != nullptr)
+            return defaultBackendPtr();
         else
             throw Exceptions::RuntimeError("No default backend specified");
     }
@@ -130,12 +140,16 @@ public:
     static std::vector<std::string> backends(void)
     {
         std::vector<std::string> result;
-        std::for_each(_backends.begin(), _backends.end(), [&](auto x){ result.push_back(x.first); });
+        std::for_each(backendsMap().begin(), backendsMap().end(), [&](auto x){ result.push_back(x.first); });
         return result;
     }
 
 public:
-    static void setDefaultBackend(const std::string &name) { _defaultBackend = findBackend(name); }
+    static void setDefaultBackend(const std::string &name)
+    {
+        /* use function wrapper to get rid of the initialization order problem */
+        defaultBackendPtr() = findBackend(name);
+    }
 
 public:
     static Variant parse(ByteSeq &&data) { return defaultBackend()->parse(std::move(data)); }

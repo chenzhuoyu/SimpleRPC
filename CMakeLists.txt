@@ -25,7 +25,6 @@ set(SIMPLE_RPC
         rpc/include/TypeInfo.h
         rpc/include/TypeWrapper.h
         rpc/include/Variant.h
-        rpc/src/backend/Backend.cpp
         rpc/src/backend/MessagePackBackend.cpp
         rpc/src/network/LocalCallSite.cpp
         rpc/src/ByteSeq.cpp
