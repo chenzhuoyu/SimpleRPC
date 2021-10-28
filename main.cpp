@@ -35,6 +35,16 @@ int main() {
     int w = 999;
     y.n = 12345;
     y.m.emplace(123, "hello, world");
+    auto &mc = SimpleRPC::metaClassOf<Test>();
+    for (auto &f : mc.fields()) {
+        fprintf(
+            stderr,
+            "> field %s: %s@%zu\n",
+            f.first.c_str(),
+            f.second->type().toSignature().c_str(),
+            f.second->offset()
+        );
+    }
     fprintf(stderr, "%s\n", SimpleRPC::Variant(test.test(x, y, "asd", w)).toString().c_str());
     fprintf(stderr, "%lu %d\n", x.size(), w);
     fprintf(stderr, "after array is %s\n", SimpleRPC::Variant(x).toString().c_str());
