@@ -58,10 +58,10 @@ struct SerializableWrapper : public Serializable
 #define __SRPC_FIELD_SIG_CAST(type, elem)               static_cast<type *>(nullptr)->BOOST_PP_SEQ_ELEM(1, elem)
 #define __SRPC_METHOD_SIG_CAST(type, elem)              static_cast<__SRPC_METHOD_SIG_TYPE(type, elem)>(&type::BOOST_PP_SEQ_ELEM(2, elem))
 
-#define __SRPC_PROXY_ARG_ITEM(i, name, type)            BOOST_PP_IF(BOOST_PP_IS_EMPTY(type), BOOST_PP_EMPTY(), type BOOST_PP_CAT(name, BOOST_PP_SUB(i, 2)))
+#define __SRPC_PROXY_ARG_ITEM(i, name, type)            BOOST_PP_IF(BOOST_PP_IS_EMPTY(type), BOOST_PP_EMPTY(), type BOOST_PP_CAT(name, BOOST_PP_SUB(i, 1)))
 #define __SRPC_PROXY_ARG_LIST(elem)                     BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(__SRPC_PROXY_ARG_ITEM, _, BOOST_PP_SEQ_ELEM(3, elem)))
 
-#define __SRPC_PROXY_CALL_ITEM(i, name, type)           BOOST_PP_IF(BOOST_PP_IS_EMPTY(type), BOOST_PP_EMPTY(), std::forward<type>(BOOST_PP_CAT(name, BOOST_PP_SUB(i, 2))))
+#define __SRPC_PROXY_CALL_ITEM(i, name, type)           BOOST_PP_IF(BOOST_PP_IS_EMPTY(type), BOOST_PP_EMPTY(), std::forward<type>(BOOST_PP_CAT(name, BOOST_PP_SUB(i, 1))))
 #define __SRPC_PROXY_CALL_LIST(elem)                    BOOST_PP_SEQ_ENUM(BOOST_PP_SEQ_TRANSFORM(__SRPC_PROXY_CALL_ITEM, _, BOOST_PP_SEQ_ELEM(3, elem)))
 
 #define __SRPC_PROXY_DECL_RAW(type, elem)
